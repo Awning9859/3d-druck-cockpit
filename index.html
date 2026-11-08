@@ -1,0 +1,1107 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<base target="_top">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0b5f69">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="3D-Druck">
+<title>3D-Druck Cockpit</title>
+<script>
+// PWA-Dateien nur einbinden, wenn die Seite nicht innerhalb von Google Apps Script läuft
+(function(){
+  if (/googleusercontent\.com$|script\.google\.com$/.test(location.hostname)) return;
+  [['manifest','manifest.webmanifest'],['apple-touch-icon','apple-touch-icon-v2.png'],['icon','icon-192-v2.png']].forEach(function(l){
+    var e=document.createElement('link'); e.rel=l[0]; e.href=l[1]; document.head.appendChild(e);
+  });
+  if ('serviceWorker' in navigator && location.protocol==='https:') navigator.serviceWorker.register('sw.js').catch(function(){});
+})();
+</script>
+<style>
+:root{
+  color-scheme:light;
+  --bg:#f4f6f5; --card:#ffffff; --ink:#15212b; --muted:#66737d; --line:#e3e8e7;
+  --accent:#0e7c86; --accent2:#0b5f69; --soft:#e4f3f2; --field:#f8fbfb;
+  --grad:linear-gradient(135deg,#0b5f69 0%,#13909a 100%);
+  --ok:#15803d; --okbg:#e7f5ec; --warn:#b45309; --warnbg:#fdf3e4; --bad:#c62828; --badbg:#fdecec;
+  --shadow:0 1px 2px rgba(17,24,39,.05),0 4px 12px rgba(17,24,39,.05);
+}
+@media (prefers-color-scheme: dark){
+  :root{color-scheme:dark;--bg:#0f1115;--card:#181b21;--ink:#e5e7eb;--muted:#9ca3af;--line:#2a2e36;--soft:#14363a;--field:#13161b;
+    --accent:#5cc8cf;--accent2:#9fe0e4;--grad:linear-gradient(135deg,#0a4249,#0f6a73);
+    --okbg:#12301f;--warnbg:#33240c;--badbg:#3a1414;--shadow:0 1px 2px rgba(0,0,0,.5)}
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0}
+body{font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;background:var(--bg);color:var(--ink);padding-bottom:calc(96px + env(safe-area-inset-bottom));-webkit-text-size-adjust:100%;font-size:15px}
+header{background:var(--grad);color:#fff;padding:calc(14px + env(safe-area-inset-top)) 18px 18px;position:sticky;top:0;z-index:5;border-radius:0 0 24px 24px;box-shadow:0 6px 18px rgba(11,95,105,.25)}
+header .row{max-width:720px;margin:0 auto}
+header h1{font-size:21px;margin:0;letter-spacing:.2px;font-weight:800}
+.sub{font-size:12px;opacity:.92;margin-top:4px;display:flex;align-items:center;gap:6px}
+.dot{width:8px;height:8px;border-radius:50%;background:#fbbf24;display:inline-block}
+.dot.on{background:#4ade80}
+main{padding:16px 14px;max-width:720px;margin:0 auto}
+nav{position:fixed;left:10px;right:10px;bottom:calc(10px + env(safe-area-inset-bottom));display:flex;gap:2px;padding:6px;background:rgba(255,255,255,.86);-webkit-backdrop-filter:blur(16px);backdrop-filter:blur(16px);border:1px solid var(--line);border-radius:24px;z-index:6;box-shadow:0 6px 20px rgba(17,24,39,.12);max-width:700px;margin:0 auto}
+body.nl{padding-bottom:calc(170px + env(safe-area-inset-bottom))} body.nl nav{bottom:calc(78px + env(safe-area-inset-bottom))}
+@media (prefers-color-scheme: dark){ nav{background:rgba(26,22,41,.88)} }
+nav button{flex:1;padding:7px 0 6px;border:0;background:none;font-size:10.5px;color:var(--muted);display:flex;flex-direction:column;align-items:center;gap:2px;font-family:inherit;border-radius:18px;transition:background .15s,color .15s}
+nav svg{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
+nav button.on{color:var(--accent);font-weight:700;background:var(--soft)}
+h2{font-size:13px;margin:20px 6px 10px;color:var(--muted);text-transform:uppercase;letter-spacing:.9px;font-weight:800}
+h3{font-size:18px;margin:2px 0 12px;font-weight:800}
+.card{background:var(--card);border-radius:22px;padding:16px;margin-bottom:12px;box-shadow:var(--shadow);border:1px solid var(--line)}
+.kpis{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:4px}
+.kpi{border-radius:20px;padding:13px 15px;box-shadow:var(--shadow);position:relative;overflow:hidden;background:var(--card);border:1px solid var(--line)}
+
+
+.kpi b{display:block;font-size:23px;margin-top:3px;font-weight:800}
+.kpi span{font-size:12px;color:var(--muted);font-weight:600}
+.kpi.hot b{color:var(--warn)}
+.kpis .kpi:nth-child(4n+1){background:#fff6ea;border-color:#fbe6c8}.kpis .kpi:nth-child(4n+2){background:#eaf6f6;border-color:#cfe9ea}.kpis .kpi:nth-child(4n+3){background:#eef2fb;border-color:#d9e1f4}.kpis .kpi:nth-child(4n+4){background:#edf8f0;border-color:#d3ecd9}
+@media (prefers-color-scheme: dark){ .kpis .kpi{background:var(--card)!important;border-color:var(--line)!important} }
+.row{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.wrap{flex-wrap:wrap}
+.muted{color:var(--muted);font-size:13px}
+.pill{display:inline-block;font-size:12px;padding:3px 9px;border-radius:20px;background:var(--soft);color:var(--accent2);font-weight:600;white-space:nowrap}
+.pill.ok{background:var(--okbg);color:var(--ok)}
+.pill.warn{background:var(--warnbg);color:var(--warn)}
+.pill.bad{background:var(--badbg);color:var(--bad)}
+.warn{color:var(--warn);font-size:13px}
+.err{color:var(--bad);font-size:13px}
+button{font-family:inherit}
+.btn{background:var(--grad);color:#fff;border:0;border-radius:14px;padding:11px 16px;font-size:15px;font-weight:700;touch-action:manipulation;cursor:pointer;}
+.btn:active{transform:scale(.98)}
+.btn.sec,.btn.ghost,.btn.danger{box-shadow:none}
+.btn.sec{background:var(--soft);color:var(--accent2)}
+.btn.ghost{background:transparent;color:var(--accent);padding:8px 10px}
+.btn.danger{background:var(--badbg);color:var(--bad)}
+.btn.big{width:100%;padding:15px;font-size:16px;margin-top:10px}
+.btn:disabled{opacity:.5}
+.btns{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+label{display:block;font-size:13px;color:var(--muted);margin:10px 0 4px;font-weight:600}
+input,select,textarea{width:100%;font-size:16px;padding:12px;border:1px solid var(--line);border-radius:12px;background:var(--field);color:var(--ink);font-family:inherit}
+input:focus,select:focus,textarea:focus{outline:2px solid var(--accent);outline-offset:0;border-color:transparent}
+.inp-row{display:flex;gap:10px}.inp-row>div{flex:1;min-width:0}
+table{width:100%;border-collapse:collapse;font-size:14px}
+td,th{padding:8px 4px;border-bottom:1px solid var(--line);text-align:left}
+td.r,th.r{text-align:right}
+.toast{position:fixed;top:calc(14px + env(safe-area-inset-top));left:50%;transform:translateX(-50%);background:#0f172a;color:#fff;padding:11px 16px;border-radius:12px;font-size:14px;display:none;z-index:40;max-width:92%;box-shadow:0 8px 24px rgba(0,0,0,.25)}
+.toast.bad{background:var(--bad)}
+.ov{display:none;position:fixed;inset:0;background:rgba(15,23,42,.5);z-index:20;overflow:auto;padding:12px}
+.ov.top{z-index:30}
+.ov .card{max-width:560px;margin:max(16px,env(safe-area-inset-top)) auto 24px}
+.mh{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px}
+.mh h3{margin:0}
+.x{border:0;background:var(--soft);color:var(--accent2);width:34px;height:34px;border-radius:50%;font-size:16px}
+details{margin-bottom:8px}
+.sumh{font-weight:700;font-size:15px;padding:12px 4px;cursor:pointer;color:var(--accent2);list-style:none;display:flex;justify-content:space-between;align-items:center}
+.sumh::-webkit-details-marker{display:none}
+.sumh::after{content:'▾';color:var(--muted)}
+details[open]>.sumh::after{content:'▴'}
+.th{width:46px;height:46px;border-radius:14px;object-fit:cover;flex:0 0 auto;background:var(--soft);display:flex;align-items:center;justify-content:center;font-weight:700;color:var(--accent2);font-size:18px}
+.th.lg{width:96px;height:96px;border-radius:18px;font-size:34px}
+.th.sm{width:36px;height:36px;border-radius:10px;font-size:14px}
+.list{background:var(--card);border:1px solid var(--line);border-radius:22px;box-shadow:var(--shadow);overflow:hidden;margin-bottom:12px}
+.li{display:flex;align-items:center;gap:12px;padding:10px 14px;border-bottom:1px solid var(--line);width:100%;background:none;border-left:0;border-right:0;border-top:0;text-align:left;color:inherit;font-size:inherit}
+.li:last-child{border-bottom:0}
+.li .t{flex:1;min-width:0}
+.li .t b{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.li .t small{display:block;color:var(--muted);font-size:12.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.li.off{opacity:.55}
+.search{margin-bottom:10px}
+.chips{display:flex;gap:8px;margin:0 0 10px;overflow-x:auto}
+.chip{border:1px solid var(--line);background:var(--card);color:var(--ink);padding:7px 12px;border-radius:20px;font-size:13px;white-space:nowrap}
+.chip.on{background:var(--accent);border-color:transparent;color:#fff;font-weight:700}
+.step{display:inline-flex;align-items:center;border:1px solid var(--line);border-radius:12px;overflow:hidden;background:var(--field)}
+.step button{border:0;background:none;width:40px;height:38px;font-size:20px;color:var(--accent);font-weight:700}
+.step button:disabled{color:var(--muted);opacity:.4}
+.step span{min-width:42px;text-align:center;font-weight:700;font-size:15px}
+.ord{border-top:1px solid var(--line);padding:12px 0 4px}
+.row + .ord{border-top:0}
+.ctl{display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:8px;margin-top:8px}
+.ctl .lbl{font-size:13px;color:var(--muted)}
+.task{border-left:4px solid #e3a03a}
+.task.late{border-left-color:var(--bad)}
+.picker-btn{display:flex;align-items:center;gap:12px;width:100%;padding:10px 12px;border:1px solid var(--line);border-radius:14px;background:var(--field);color:var(--ink);text-align:left;font-size:15px}
+.picker-btn .t{flex:1;min-width:0}
+.picker-btn small{display:block;color:var(--muted)}
+.photo{display:flex;align-items:center;gap:14px}
+.photo input{display:none}
+.sugg{position:relative}
+.sugg-list{position:absolute;left:0;right:0;top:100%;background:var(--card);border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow);z-index:4;max-height:220px;overflow:auto;display:none}
+.sugg-list button{display:block;width:100%;text-align:left;padding:11px 12px;border:0;border-bottom:1px solid var(--line);background:none;color:var(--ink);font-size:15px}
+.check{display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--line)}
+.check input{width:22px;height:22px;margin:0;flex:0 0 auto}
+.empty{text-align:center;color:var(--muted);padding:24px 8px}
+.big-num{font-size:26px;font-weight:800}
+</style>
+</head>
+<body>
+<header><div class="row" style="display:block">
+  <h1>3D-Druck Cockpit</h1>
+  <div class="sub"><span class="dot" id="dot"></span><span id="status">lädt…</span></div>
+</div></header>
+<main id="view"></main>
+<nav id="nav">
+  <button data-tab="start" class="on"><svg viewBox="0 0 24 24"><path d="M3 11l9-7 9 7v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/></svg>Start</button>
+  <button data-tab="neu"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 8v8M8 12h8"/></svg>Neu</button>
+  <button data-tab="lager"><svg viewBox="0 0 24 24"><path d="M3 7l9-4 9 4v10l-9 4-9-4z"/><path d="M3 7l9 4 9-4M12 11v10"/></svg>Lager</button>
+  <button data-tab="artikel"><svg viewBox="0 0 24 24"><path d="M20 12l-8 8-9-9V3h8z"/><circle cx="7.5" cy="7.5" r="1.5"/></svg>Artikel</button>
+  <button data-tab="zahlen"><svg viewBox="0 0 24 24"><path d="M17 6.5A7 7 0 1 0 17 17.5"/><path d="M4 10h9M4 14h9"/></svg>Zahlen</button>
+  <button data-tab="mehr"><svg viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="19" cy="12" r="1.5"/></svg>Mehr</button>
+</nav>
+<div class="toast" id="toast"></div>
+<div class="ov" id="modal"><div class="card" id="modalBody"></div></div>
+<div class="ov top" id="picker"><div class="card" id="pickerBody"></div></div>
+
+<script>
+/* ================= Einstellungen ================= */
+const API_URL = 'https://script.google.com/macros/s/AKfycbzCOCM_-jRAiI1YzVoFVQUmCWDIrMsJbJTyCYVATQOTVAGAcqBtCift2mKeT23VhmwS/exec';
+const DEMO = /[?&]demo\b/.test(location.search);   // Testmodus: Daten nur im Browser, nie in der echten Tabelle
+const POLL_MS = 10000;
+// ===== App-Version: bei JEDEM Umbau APP_BUILD erhöhen und CHANGES ergänzen =====
+const APP_VERSION = '2.7', APP_BUILD = 207, APP_DATE = '08.11.2026';
+const CHANGES = [
+  ['2.7','08.11.2026','Umzug auf GitHub Pages: keine Credits-Grenze, kein Netlify-Hinweis mehr.'],
+  ['2.6','08.11.2026','Gleichzeitiges Arbeiten: Änderungen werden zusammengeführt statt verworfen. Versionsanzeige und Update-Hinweis.'],
+  ['2.5','08.11.2026','Lager-Verlauf; Bestand zeigt frei / reserviert / unterwegs.'],
+  ['2.4','08.11.2026','„+ gedruckt“ bucht ins Lager, „+ bezahlt“ wieder aus.'],
+  ['2.3','08.11.2026','Kommission (Ware mitgeben, verkauft, zurück) und „Gedruckt → ins Lager“.'],
+  ['2.2','08.11.2026','Neues Design und App-Symbol, Datensicherung (Download + wöchentlich automatisch).'],
+  ['2.1','08.11.2026','Fotos: Kamera oder Galerie, Foto ändern/entfernen.'],
+  ['2.0','08.11.2026','Handy-App mit Fotos, Suche, Lager, Minus-Knöpfen.']
+];
+const SAVE_RATE = 0.10; // Mengenrabatt-Annahme für den Richtwert (wie in der Tabelle)
+
+/* ================= Startdaten (Export) – nur falls die Tabelle leer ist ================= */
+// [nr, name, variante, kalkuliert, manuell, aktiv, notiz, Stromkosten N, Verschleiß O, Selbstkosten-Kalk. S]
+const SEED_ART = [
+[1,"Flughörnchen","",3.5,null,1,"Lauegrün",0.105,1.5,3.22],[2,"drehbarer Oktopus","",4,null,1,"Lauegrün",0.1225,1.75,3.84525],
+[3,"Drache","",16,18,1,"",0.28,4,15.70625],[4,"schuleinführungstift","",14.5,null,1,"",0.504,7.2,14.07125],
+[5,"Drück-zum-Dreh-Quetschball","",4.5,null,0,"",0.161,2.3,4.361875],[6,"Gekettelte Zitrus-Fidget orange","",8,null,1,"",0.168,2.4,7.5775],
+[7,"Pflanzen Augen","",3.5,null,1,"",0.098,1.4,3.4435],[8,"Maiskolben mit Glubschaugen","",4,5,1,"Kalkulation bei Stk auf Platte",0.0875,1.25,3.911875],
+[9,"Geist halloween balon","",5,null,1,"",0.0805,1.15,4.583625],[10,"Monitor Ghost","",6.5,null,1,"",0.1575,2.25,6.015625],
+[11,"lilie 3fach gestrickt im Topf","",7,4.5,1,"",0.245,3.5,6.95],[12,"Gruselige Hände","",9,null,1,"",0.2275,3.25,8.53375],
+[13,"ausziehbare geister","",3.5,null,1,"",0.133,1.9,3.479],[14,"kürbis mit wackelaugen","",10,null,1,"",0.3045,4.35,9.982125],
+[15,"halloween 2 kübis konzepte","",8.5,2,1,"8 Stk 8,50 / 2 Stk 2,00",0.315,4.5,8.4085],[16,"E.T. Klein ohne Leuchtfinger","",12,null,1,"",0.308,4.4,11.5955],
+[17,"E.T. groß mit Leuchtfinger","",34,null,1,"",0.98,14,33.598125],[18,"Gremlins klein","",9,null,1,"",0.1995,2.85,8.903625],
+[19,"Gremlins 150%","",16.5,null,1,"",0.399,5.7,16.379875],[20,"Horror Dog – Der mit dem Knopfauge","",15.5,null,1,"",0.4865,6.95,15.271875],
+[21,"Barlog X=110mm x Y=123mm x Z=149","",13,null,1,"einfarbig",0.4025,5.75,12.553125],[22,"Barlog X=xxmm x Y=xxmm x Z=200","schwarz",22,11,1,"",0.7035,10.05,21.604375],
+[23,"halloween hat monitor grinch","",3,2.5,1,"8 Stück je Platte",0.030625,0.4375,2.73203125],[24,"Kürbis-Deko-Set Halloween Herbst","",4.5,null,1,"",0.14,2,4.435],
+[25,"Individuelle LEGO Figur 20 cm","",12,null,1,"",0.2765,3.95,11.933125],[26,"Individuelles LEGO namens Schild","",7,null,1,"",0.1225,1.75,6.928125],
+[27,"neugierige katze","",3.5,null,1,"",0.07,1,3.2075],[28,"Coraline Bath and Body Works Kerzenhalter","",29.5,null,1,"",1.0045,14.35,29.467125],
+[29,"Zero – Der Geisterhund * 500% ~12 cm","",13,null,1,"",0.434,6.2,12.8465],[30,"Mein letzter Nerv","",7,null,1,"",0.2275,3.25,6.684375],
+[31,"gestrickter Grinch, 10 cm","",11.5,7.5,1,"",0.378,5.4,11.0945],[32,"Gestrickte Weihnachtsschleife","",4,null,1,"",0.14,2,3.709],
+[33,"Minigrinch-Monitor","",4,null,1,"",0.133,1.9,3.96275]
+];
+// [Datum, Besteller, Artikelnr, Variante, manueller Stückpreis, bestellt, gedruckt, bezahlt, Notiz]
+const SEED_ORD = []; // Startbestellungen entfernt (Daten kommen aus der Google-Tabelle; keine Namen im öffentlichen Code)
+const DEF_SET = {rolle:1000,strom:0.35,watt:100,verschl:0.5,arbeit:15,ausschuss:0.10,gewinn:0.25,runden:0.5};
+function defaults(){
+  return { v:3, rev:0, settings:{...DEF_SET},
+    articles:SEED_ART.map(a=>({nr:a[0],name:a[1],variant:a[2],calc:a[3],manual:a[4],active:a[5]===1,note:a[6],N:a[7],O:a[8],S:a[9],stock:0,img:null})),
+    orders:SEED_ORD.map((o,i)=>({id:'o'+(i+1),date:o[0],buyer:o[1],nr:o[2],variant:o[3],manual:o[4],qty:o[5],printed:o[6],paid:o[7],note:o[8]})) };
+}
+// Ältere Stände um neue Felder ergänzen
+function normalize(x){
+  x.settings = Object.assign({...DEF_SET}, x.settings||{});
+  x.articles.forEach(a=>{ if(!Number.isFinite(a.stock)) a.stock=0; if(a.img===undefined) a.img=null; if(a.active===undefined) a.active=true; });
+  // Lagerlogik v4: gedruckte, noch nicht bezahlte Stücke liegen im Lager (inStock).
+  // Ältere Bestellungen: deren gedruckte, unbezahlte Stücke gelten als schon übergeben (legacy), Lager bleibt unverändert.
+  x.orders.forEach(o=>{ if(!Number.isFinite(o.inStock)){ o.inStock=0; o.legacy=Math.max(0,(o.printed||0)-(o.paid||0)); } if(!Number.isFinite(o.legacy)) o.legacy=0; delete o.fromStock; });
+  if(!Array.isArray(x.consign)) x.consign=[];   // Kommission (mitgegebene Ware)
+  if(!Array.isArray(x.moves)) x.moves=[];       // Lager-Verlauf (neueste zuerst, max. 200)
+  return x;
+}
+
+/* ================= Hilfsfunktionen ================= */
+let S=null, live=false, tab='start', saving=false, dirty=false;
+let selBuyer=null, paySel={}, delArmed=false, artFilter='aktiv', lagerFilter='alle';
+let lagerMode='bestand', kommFilter='offen', mNr=null, mQty=1;
+let newNr=null, newQty=1, editNr=null, pendingImg={}; // pendingImg[ziel] = data-URL | '' (entfernen)
+const $ = s => document.querySelector(s);
+const esc = s => String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const EUR = n => Number(n||0).toLocaleString('de-DE',{style:'currency',currency:'EUR'});
+const num = v => { const t=String(v==null?'':v).replace(/\s/g,'').replace(',','.'); if(t==='') return null; const n=Number(t); return Number.isFinite(n)?n:NaN; };
+const dec = n => String(n).replace('.',',');
+const today = () => new Date().toISOString().slice(0,10);
+const daysSince = d => Math.floor((new Date(today())-new Date(d))/86400000);
+const fmtDate = d => { const p=String(d).split('-'); return p.length===3?`${p[2]}.${p[1]}.${p[0]}`:d; };
+const art = nr => S.articles.find(a=>a.nr===Number(nr));
+const usedPrice = a => a.manual!=null ? a.manual : (a.calc!=null ? a.calc : null);
+const itemName = o => { const a=art(o.nr); const v=o.variant||(a&&a.variant)||''; return (a?a.name:'Artikel '+o.nr)+(v?' ('+v+')':''); };
+const byName = (x,y) => x.localeCompare(y,'de',{sensitivity:'base'});
+const buyers = () => [...new Set(S.orders.map(o=>o.buyer))].sort(byName);
+const hasGas = () => !!(window.google && google.script && google.script.run);
+const nextNr = () => Math.max(0,...S.articles.map(a=>a.nr))+1;
+
+function info(o){
+  const a = art(o.nr);
+  const u = o.manual!=null ? o.manual : (a ? usedPrice(a) : null);
+  const ok = u!=null && !Number.isNaN(u);
+  return { a, u, ok,
+    toPrint: Math.max(0,o.qty-o.printed),
+    billable: Math.max(0,Math.min(o.printed,o.qty)-o.paid),
+    open: ok ? Math.max(0,o.qty-o.paid)*u : 0,
+    sum: ok ? o.qty*u : 0, got: ok ? o.paid*u : 0,
+    done: o.printed>=o.qty && o.paid>=o.qty };
+}
+function richtwert(a){
+  if(!a || a.calc==null || a.S==null || a.N==null || a.O==null) return null;
+  if(usedPrice(a)!==a.calc) return null;
+  const s=S.settings, raw=a.S - SAVE_RATE*(a.N+a.O)*(1+s.gewinn);
+  return Math.ceil(Math.max(0,raw)/s.runden - 1e-9)*s.runden;
+}
+
+/* ================= Bilder ================= */
+const imgMem = {}, imgLoading = {};
+function imgKey(a){ return a && a.img ? a.nr+':'+a.img : null; }
+function cachedImg(k){
+  if(imgMem[k]) return imgMem[k];
+  try{ const c=JSON.parse(localStorage.getItem('ci:'+k.split(':')[0])||'null'); if(c && c.k===k){ imgMem[k]=c.d; return c.d; } }catch(e){}
+  return null;
+}
+function storeImg(k,d){ imgMem[k]=d; try{ localStorage.setItem('ci:'+k.split(':')[0], JSON.stringify({k,d})); }catch(e){} }
+function thumb(a, cls){
+  const k = imgKey(a), c = cls||'';
+  if(k){ const d=cachedImg(k); return `<img class="th ${c}" alt="" data-img="${k}"${d?` src="${d}"`:''}>`; }
+  const ch = a ? (a.name||'?').trim().charAt(0).toUpperCase() : '?';
+  return `<div class="th ${c}">${esc(ch)}</div>`;
+}
+function hydrateImgs(){
+  document.querySelectorAll('img[data-img]:not([src])').forEach(el=>{
+    const k=el.dataset.img, d=cachedImg(k);
+    if(d){ el.src=d; return; }
+    if(imgLoading[k] || !live) return;
+    imgLoading[k]=true;
+    call('getImage', k.split(':')[0]).then(data=>{
+      if(data){ storeImg(k,data); document.querySelectorAll(`img[data-img="${k}"]`).forEach(e=>e.src=data); }
+    }).catch(()=>{}).finally(()=>{ setTimeout(()=>{ delete imgLoading[k]; }, 30000); });
+  });
+}
+// Foto verkleinern (max. 320 px, JPEG) → data-URL
+function readImage(file){
+  return new Promise((res,rej)=>{
+    const url=URL.createObjectURL(file), img=new Image();
+    img.onload=()=>{
+      const max=320, s=Math.min(1,max/Math.max(img.naturalWidth,img.naturalHeight));
+      const w=Math.max(1,Math.round(img.naturalWidth*s)), h=Math.max(1,Math.round(img.naturalHeight*s));
+      const c=document.createElement('canvas'); c.width=w; c.height=h;
+      const g=c.getContext('2d'); g.fillStyle='#fff'; g.fillRect(0,0,w,h); g.drawImage(img,0,0,w,h);
+      URL.revokeObjectURL(url);
+      let q=0.75, d=c.toDataURL('image/jpeg',q);
+      while(d.length>45000 && q>0.3){ q-=0.1; d=c.toDataURL('image/jpeg',q); }
+      d.length>45000 ? rej(new Error('Bild zu groß')) : res(d);
+    };
+    img.onerror=()=>{ URL.revokeObjectURL(url); rej(new Error('Bild konnte nicht gelesen werden')); };
+    img.src=url;
+  });
+}
+function photoField(target, a){
+  const p = pendingImg[target];
+  let preview, has;
+  if(p){ preview=`<img class="th lg" alt="" src="${p}">`; has=true; }
+  else if(p==='' || !a || !a.img){ preview='<div class="th lg">📷</div>'; has=false; }
+  else { preview=thumb(a,'lg'); has=true; }
+  const pb='display:flex;align-items:center;justify-content:center;margin:0;color:var(--accent2);padding:10px 8px;font-size:14px;flex:1';
+  return `<label>Foto${has?' – zum Ändern einfach ein neues aufnehmen':''}</label><div class="photo">${preview}
+    <div style="flex:1;min-width:0"><div style="display:flex;gap:8px">
+      <label class="btn sec" style="${pb}">📷 Kamera<input type="file" accept="image/*" capture="environment" data-photo="${target}"></label>
+      <label class="btn sec" style="${pb}">🖼️ Galerie<input type="file" accept="image/*" data-photo="${target}"></label></div>
+    ${has?`<button class="btn ghost" data-act="photo-del" data-t="${target}" style="color:var(--bad);padding:8px 2px">🗑️ Foto entfernen</button>`:'<div class="muted" style="margin-top:6px">Kleines Bild reicht – wird automatisch verkleinert.</div>'}
+    </div></div>`;
+}
+// Bild hochladen und am Artikel vermerken; false bei Fehler
+async function applyPhoto(a, target){
+  const p = pendingImg[target];
+  if(p===undefined) return true;
+  if(!live){ toast('Foto braucht Verbindung zur gemeinsamen Tabelle', true); return false; }
+  try{
+    const r = await call('saveImage', String(a.nr), p||'');
+    if(!r || !r.ok) throw new Error((r&&r.error)||'Upload fehlgeschlagen');
+    if(p){ const v=Date.now().toString(36); a.img=v; storeImg(a.nr+':'+v, p); } else a.img=null;
+    delete pendingImg[target];
+    return true;
+  }catch(e){ toast('Foto nicht gespeichert: '+e.message, true); return false; }
+}
+
+/* ================= Server / Speichern ================= */
+let demoDb = null;
+function demoCall(fn, args){
+  if(!demoDb){ try{ demoDb=JSON.parse(localStorage.getItem('demoDb')||'null'); }catch(e){} demoDb=demoDb||{state:null,img:{}}; }
+  const save=()=>{ try{ localStorage.setItem('demoDb',JSON.stringify(demoDb)); }catch(e){} };
+  return new Promise(r=>setTimeout(()=>{
+    if(fn==='getState') return r(demoDb.state);
+    if(fn==='getImage') return r(demoDb.img[args[0]]||null);
+    if(fn==='saveImage'){ demoDb.img[args[0]]=args[1]; save(); return r({ok:true}); }
+    if(fn==='saveState'){
+      const inc=JSON.parse(args[0]), st=demoDb.state?JSON.parse(demoDb.state):null, sr=st?st.rev||0:0;
+      if(st && sr>Number(args[1]||0)) return r({ok:false,conflict:true,state:demoDb.state});
+      inc.rev=Math.max(Date.now(),sr+1); demoDb.state=JSON.stringify(inc); save(); return r({ok:true,rev:inc.rev});
+    }
+  },120));
+}
+async function apiGet(params){
+  const r = await fetch(API_URL+'?'+new URLSearchParams(params), {credentials:'omit', cache:'no-store'});
+  const j = await r.json(); if(!j.ok) throw new Error(j.error||'Serverfehler'); return j;
+}
+async function apiPost(body){
+  const r = await fetch(API_URL, {method:'POST', credentials:'omit', headers:{'Content-Type':'text/plain;charset=utf-8'}, body:JSON.stringify(body)});
+  return r.json();
+}
+function call(fn, ...args){
+  if(DEMO) return demoCall(fn, args);
+  if(hasGas()) return new Promise((res,rej)=>google.script.run.withSuccessHandler(res).withFailureHandler(rej)[fn](...args));
+  if(fn==='getState') return apiGet({a:'state'}).then(j=>j.state);
+  if(fn==='getImage') return apiGet({a:'img',k:args[0]}).then(j=>j.data);
+  if(fn==='saveState') return apiPost({a:'save',json:args[0],baseRev:args[1]});
+  if(fn==='saveImage') return apiPost({a:'img',k:args[0],data:args[1]});
+  return Promise.reject(new Error('unbekannt'));
+}
+/* ----- Gleichzeitiges Arbeiten: Zusammenführen statt Überschreiben -----
+   BASE = letzter Stand vom Server, auf dem die eigenen Änderungen beruhen.
+   Bei einem Konflikt wird (BASE, eigener Stand, Server-Stand) je Bestellung/Artikel/Kommission und Feld zusammengeführt:
+   nur eine Seite geändert → diese gilt; beide geändert → Zähler (gedruckt, bezahlt, Lager …) werden addiert, sonst gilt die eigene Änderung. */
+const LKEY = DEMO?'cockpit3d-demo':'cockpit3d';
+let BASE=null;
+const clone = x => JSON.parse(JSON.stringify(x));
+const same = (a,b) => JSON.stringify(a)===JSON.stringify(b);
+const COUNTERS = new Set(['printed','paid','stock','sold','returned','inStock','legacy']);
+function setBase(x){ BASE=clone(x); try{ localStorage.setItem(LKEY+'-base', JSON.stringify(BASE)); }catch(e){} }
+function mergeObj(b,l,r){
+  const out={...r};
+  for(const k of new Set([...Object.keys(l),...Object.keys(r)])){
+    const bv=b?b[k]:undefined, lv=l[k], rv=r[k];
+    if(same(lv,bv)) out[k]=rv;                                                                   // nur drüben geändert
+    else if(COUNTERS.has(k) && [bv,lv,rv].every(v=>typeof v==='number')) out[k]=Math.max(0,rv+(lv-bv)); // Zähler: eigene Änderung dazurechnen
+    else out[k]=lv;                                                                              // sonst gilt die eigene Änderung
+  }
+  return out;
+}
+function mergeList(b,l,r,key){
+  const mb=new Map((b||[]).map(x=>[x[key],x])), ml=new Map(l.map(x=>[x[key],x])), mr=new Map(r.map(x=>[x[key],x]));
+  const out=[];
+  for(const id of [...new Set([...r.map(x=>x[key]),...l.map(x=>x[key])])]){
+    const bx=mb.get(id), lx=ml.get(id), rx=mr.get(id);
+    if(lx&&rx) out.push(bx?mergeObj(bx,lx,rx):lx);
+    else if(lx) { if(!bx || !same(lx,bx)) out.push(lx); }      // neu hier – oder drüben gelöscht, hier aber geändert
+    else if(rx) { if(!bx || !same(rx,bx)) out.push(rx); }      // neu drüben – oder hier gelöscht, drüben aber geändert
+  }
+  return out;
+}
+function mergeState(b, l, r){
+  b=b||{articles:[],orders:[],consign:[],moves:[],settings:{}}; l=clone(l); r=clone(r);
+  // Gleiche Artikelnummer auf beiden Seiten neu vergeben → eigenen Artikel umnummerieren
+  const bn=new Set(b.articles.map(a=>a.nr)), rmap=new Map(r.articles.map(a=>[a.nr,a]));
+  let maxNr=Math.max(0,...l.articles.map(a=>a.nr),...r.articles.map(a=>a.nr));
+  for(const a of l.articles){
+    if(bn.has(a.nr) || !rmap.has(a.nr) || same(a,rmap.get(a.nr))) continue;
+    const old=a.nr, nu=++maxNr; a.nr=nu;
+    l.orders.forEach(o=>{ if(o.nr===old && !b.orders.some(x=>x.id===o.id)) o.nr=nu; });
+    l.consign.forEach(c=>{ if(c.nr===old && !b.consign.some(x=>x.id===c.id)) c.nr=nu; });
+    (l.moves||[]).forEach(m=>{ if(m.nr===old && !(b.moves||[]).some(x=>x.d===m.d&&x.w===m.w)) m.nr=nu; });
+    if(a.img){ const d=cachedImg(old+':'+a.img); if(d){ storeImg(nu+':'+a.img,d); call('saveImage',String(nu),d).catch(()=>{}); } }
+  }
+  const m={...r};
+  m.settings=mergeObj(b.settings||{}, l.settings||{}, r.settings||{});
+  m.articles=mergeList(b.articles,l.articles,r.articles,'nr');
+  m.orders=mergeList(b.orders,l.orders,r.orders,'id');
+  m.consign=mergeList(b.consign||[],l.consign||[],r.consign||[],'id');
+  const mk=x=>x.d+'|'+x.nr+'|'+x.n+'|'+x.w, seen=new Set();
+  m.moves=[...(r.moves||[]),...(l.moves||[])].filter(x=>{ const k=mk(x); if(seen.has(k)) return false; seen.add(k); return true; })
+    .sort((x,y)=>y.d.localeCompare(x.d)).slice(0,200);
+  m.rev=r.rev; m.appBuild=Math.max(l.appBuild||0, r.appBuild||0);
+  return normalize(m);
+}
+
+function adopt(x){ S=normalize(x); setBase(S); saveLocal(); }
+function saveLocal(){ try{ localStorage.setItem(LKEY, JSON.stringify(S)); }catch(e){} }
+function persist(){ saveLocal(); dirty=true; flush(); }
+async function flush(){
+  if(!live || saving || !dirty) return;
+  saving=true; dirty=false;
+  try{
+    if((S.appBuild||0)<APP_BUILD) S.appBuild=APP_BUILD;   // zeigt älteren Geräten: es gibt eine neuere Version
+    const sent=JSON.stringify(S);
+    const r = await call('saveState', sent, S.rev||0);
+    if(r && r.ok){ S.rev=r.rev; const s=JSON.parse(sent); s.rev=r.rev; setBase(s); saveLocal(); }
+    else if(r && r.conflict){
+      const remote=normalize(JSON.parse(r.state));
+      S=mergeState(BASE, S, remote); setBase(remote); saveLocal();
+      dirty=true;                                   // zusammengeführten Stand gleich speichern
+      if(!busy()) render();
+    }
+    else toast('Speichern fehlgeschlagen: '+((r&&r.error)||'unbekannt'), true);
+  }catch(e){
+    dirty=true; live=false; setStatus(); toast('Keine Verbindung. Änderung nur auf diesem Gerät gespeichert.', true);
+  }finally{ saving=false; }
+  if(dirty) flush();
+}
+function toast(msg, bad){
+  const t=$('#toast'); t.textContent=msg; t.className='toast'+(bad?' bad':''); t.style.display='block';
+  clearTimeout(toast._t); toast._t=setTimeout(()=>t.style.display='none', bad?4000:2400);
+}
+function setStatus(){
+  $('#dot').className='dot'+(live?' on':'');
+  const day=new Date().toLocaleDateString('de-DE',{weekday:'long',day:'numeric',month:'long'});
+  $('#status').textContent=(DEMO?'TESTMODUS · ':'')+(live?day:'Offline – Änderungen nur auf diesem Gerät');
+}
+
+/* ================= Lager ================= */
+// a.stock = alle Stücke, die physisch da sind. Davon für Bestellungen reserviert = gedruckt, aber noch nicht bezahlt/abgeholt.
+const reserved = a => S.orders.reduce((s,o)=>s+(o.nr===a.nr?(o.inStock||0):0),0);
+const freeStock = a => Math.max(0,(a.stock||0)-reserved(a));
+const inKomm = a => S.consign.reduce((s,c)=>s+(c.nr===a.nr?Math.max(0,c.qty-c.sold-c.returned):0),0);
+function logMove(nr, n, why){ if(!n) return; S.moves.unshift({d:new Date().toISOString(),nr,n,w:why}); if(S.moves.length>200) S.moves.length=200; }
+function moveRows(list){
+  return list.length?list.map(m=>{ const a=art(m.nr), dt=new Date(m.d); return `<div class="li">${thumb(a,'sm')}<div class="t"><b>${esc(a?a.name:'Artikel '+m.nr)}</b><small>${esc(m.w)} · ${dt.toLocaleDateString('de-DE')} ${dt.toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'})}</small></div><b style="color:${m.n>0?'var(--ok)':'var(--bad)'}">${m.n>0?'+':'−'}${Math.abs(m.n)}</b></div>`; }).join(''):'<div class="empty">Noch keine Lagerbewegungen</div>';
+}
+// Gedruckt/bezahlt ändern und Lager mitführen: gedruckt → ins Lager, bezahlt (= abgeholt) → aus dem Lager
+function setPP(o, pr, pd){
+  const a=art(o.nr), sum={};
+  const add=(n,why)=>{ if(a) a.stock=Math.max(0,(a.stock||0)+n); sum[why]=(sum[why]||0)+n; };
+  while(o.printed<pr){ o.printed++; o.inStock++; add(1,'Gedruckt für Bestellung'); }
+  while(o.printed>pr){ const held=o.printed>o.paid; o.printed--; if(held){ if(o.inStock>0){ o.inStock--; add(-1,'„Gedruckt“ zurückgenommen'); } else if(o.legacy>0) o.legacy--; } }
+  while(o.paid<pd){ const held=o.printed>o.paid; o.paid++; if(held){ if(o.legacy>0) o.legacy--; else if(o.inStock>0){ o.inStock--; add(-1,'Bezahlt/abgeholt'); } } }
+  while(o.paid>pd){ o.paid--; if(Math.max(0,o.printed-o.paid)>o.inStock+o.legacy){ o.inStock++; add(1,'„Bezahlt“ zurückgenommen'); } }
+  Object.keys(sum).forEach(w=>logMove(o.nr,sum[w],w+' – '+o.buyer));
+}
+// Neue Bestellung: freie Stücke aus dem Lager für die Bestellung reservieren (zählen als gedruckt)
+function takeFromStock(o){
+  const a=art(o.nr); if(!a) return 0;
+  const take=Math.min(freeStock(a), o.qty);
+  o.printed=take; o.inStock=take; o.legacy=0;
+  return take;
+}
+
+/* ================= Ansichten ================= */
+function stepper(act, id, val, max, min){
+  return `<div class="step"><button data-act="${act}-" data-id="${id}" ${val<=(min||0)?'disabled':''} aria-label="weniger">−</button><span>${val}${max!=null?'/'+max:''}</span><button data-act="${act}+" data-id="${id}" ${max!=null&&val>=max?'disabled':''} aria-label="mehr">+</button></div>`;
+}
+
+function vStart(){
+  const rows=S.orders.map(o=>({o,i:info(o)}));
+  const open=rows.filter(r=>!r.i.done);
+  const sumOpen=rows.reduce((s,r)=>s+r.i.open,0), toPrint=rows.reduce((s,r)=>s+r.i.toPrint,0);
+  const stockN=S.articles.reduce((s,a)=>s+(a.stock||0),0);
+  let h=`<div class="kpis">
+    <div class="kpi ${sumOpen>0?'hot':''}"><span>Offen (Geld)</span><b>${EUR(sumOpen)}</b></div>
+    <div class="kpi"><span>Noch zu drucken</span><b>${toPrint} Stk.</b></div>
+    <div class="kpi"><span>Offene Bestellungen</span><b>${open.length}</b></div>
+    <div class="kpi"><span>Im Lager</span><b>${stockN} Stk.</b></div></div>
+    <h2>Offene Aufgaben</h2>`;
+  if(!open.length) return h+`<div class="card empty">🎉 Alles erledigt.</div>`;
+  const groups={}; open.forEach(r=>{ (groups[r.o.buyer]=groups[r.o.buyer]||[]).push(r); });
+  for(const name of Object.keys(groups).sort(byName)){
+    const rs=groups[name].sort((a,b)=>a.o.date.localeCompare(b.o.date));
+    const sum=rs.reduce((s,r)=>s+r.i.open,0);
+    const late=rs.some(r=>r.i.toPrint>0 && daysSince(r.o.date)>4);
+    const payAll=rs.some(r=>Math.min(r.o.qty,r.o.printed)>r.o.paid);
+    h+=`<div class="card task ${late?'late':''}">
+      <div class="row"><b style="font-size:17px">${esc(name)}</b><span class="pill ${sum>0?'warn':''}">${EUR(sum)}</span></div>
+      ${rs.map(({o,i})=>`<div class="ord">
+        <div class="row" data-edit="${o.id}" style="cursor:pointer">${thumb(i.a,'sm')}<div style="flex:1;min-width:0"><b>${esc(itemName(o))}</b> · ${o.qty} Stk.
+          <div class="muted">${fmtDate(o.date)}${i.toPrint>0&&daysSince(o.date)>4?' · <span class="err">über 4 Tage</span>':''} · ${i.ok?EUR(i.u)+'/Stk.':'<span class="err">kein Preis</span>'}${o.inStock?` · 📦 ${o.inStock} bereit im Lager`:''}</div></div><span class="muted">✎</span></div>
+        <div class="ctl"><span class="lbl">Gedruckt</span><span></span>${stepper('pr',o.id,o.printed,o.qty)}</div>
+        <div class="ctl"><span class="lbl">Bezahlt</span><span></span>${stepper('pd',o.id,o.paid,o.qty)}</div>
+      </div>`).join('')}
+      ${payAll?`<button class="btn sec big" data-act="pay-all" data-buyer="${esc(name)}">Alles Gedruckte von ${esc(name)} als bezahlt</button>`:''}
+    </div>`;
+  }
+  return h;
+}
+
+function artPickBtn(nr, act){
+  const a=nr!=null?art(nr):null;
+  return `<button class="picker-btn" data-act="${act}">${a?thumb(a):'<div class="th">?</div>'}<span class="t"><b>${a?esc(a.nr+'. '+a.name):'Artikel wählen…'}</b>
+    <small>${a?`${usedPrice(a)!=null?EUR(usedPrice(a)):'kein Preis'} · Lager: ${a.stock||0}${reserved(a)?` (frei ${freeStock(a)})`:''}`:'Antippen und Namen suchen'}</small></span><span class="muted">🔍</span></button>`;
+}
+function vNeu(){
+  const a=newNr!=null?art(newNr):null;
+  return `<div class="card"><h3>Neue Bestellung</h3>
+    <label>Besteller</label>
+    <div class="sugg"><input id="f_buyer" placeholder="Name eingeben" autocomplete="off"><div class="sugg-list" id="f_sugg"></div></div>
+    <label>Artikel</label>${artPickBtn(newNr,'pick-new')}
+    <div class="inp-row">
+      <div><label>Menge</label>${stepper('nq','x',newQty,null,1)}</div>
+      <div><label>Datum</label><input id="f_date" type="date" value="${today()}"></div>
+    </div>
+    <label>Variante (optional)</label><input id="f_var" value="${esc(a?a.variant:'')}">
+    <label>Manueller Stückpreis (optional)</label><input id="f_manual" inputmode="decimal" placeholder="leer = Artikelpreis">
+    <label>Notiz (optional)</label><input id="f_note">
+    <div id="f_out" class="muted" style="margin-top:10px"></div>
+    <button class="btn big" data-act="save-new">Bestellung speichern</button></div>`;
+}
+function updNeu(){
+  const out=$('#f_out'); if(!out) return;
+  const a=newNr!=null?art(newNr):null, m=num($('#f_manual').value);
+  if(!a){ out.innerHTML=''; return; }
+  const u=(m!=null&&!Number.isNaN(m))?m:usedPrice(a);
+  let h=u==null?'<span class="err">Kein Preis – bitte manuell eingeben</span>':`Stückpreis <b>${EUR(u)}</b> · Summe <b>${EUR(u*newQty)}</b>`;
+  const take=Math.min(freeStock(a),newQty);
+  if(take>0) h+=`<div class="pill ok" style="margin-top:8px">📦 ${take} Stk. werden aus dem Lager genommen</div>`;
+  const rw=richtwert(a);
+  if(rw!=null && newQty>=3) h+=`<div class="warn" style="margin-top:8px">Richtwert Mengenpreis ab 3 Stk.: ${EUR(rw)} pro Stück (wird nicht automatisch übernommen). <button class="btn ghost" data-act="richtwert" data-v="${dec(rw)}">Übernehmen</button></div>`;
+  out.innerHTML=h; hydrateImgs();
+}
+
+/* ----- Kommission ----- */
+function cInfo(c){ const out=Math.max(0,c.qty-c.sold-c.returned); return {out, due:Math.max(0,c.sold-c.paid)*(c.price||0), done:out===0&&c.paid>=c.sold}; }
+function kommSums(){ return S.consign.reduce((t,c)=>{ const i=cInfo(c); t.out+=i.out; t.due+=i.due; return t; },{out:0,due:0}); }
+function vKomm(){
+  const k=kommSums();
+  const list=S.consign.filter(c=>kommFilter==='alle'||!cInfo(c).done);
+  const groups={}; list.forEach(c=>{ (groups[c.person]=groups[c.person]||[]).push(c); });
+  let h=`<div class="kpis"><div class="kpi"><span>Unterwegs</span><b>${k.out} Stk.</b></div><div class="kpi hot"><span>Noch zu bekommen</span><b>${EUR(k.due)}</b></div></div>
+    <button class="btn big" style="margin:4px 0 12px" data-act="komm-new">+ Ware mitgeben</button>
+    <div class="chips"><button class="chip ${kommFilter==='offen'?'on':''}" data-act="kf" data-v="offen">Offen</button><button class="chip ${kommFilter==='alle'?'on':''}" data-act="kf" data-v="alle">Alle (auch erledigte)</button></div>`;
+  const names=Object.keys(groups).sort(byName);
+  if(!names.length) h+=`<div class="card empty">Keine Ware unterwegs.</div>`;
+  for(const p of names){
+    const cs=groups[p].sort((a,b)=>b.date.localeCompare(a.date));
+    const out=cs.reduce((s,c)=>s+cInfo(c).out,0), due=cs.reduce((s,c)=>s+cInfo(c).due,0);
+    h+=`<div class="card"><div class="row"><b style="font-size:17px">${esc(p)}</b><span>${out?`<span class="pill">${out} unterwegs</span> `:''}${due?`<span class="pill warn">${EUR(due)} offen</span>`:''}${!out&&!due?'<span class="pill ok">erledigt</span>':''}</span></div>
+      ${cs.map(c=>{ const a=art(c.nr), i=cInfo(c); return `<div class="ord">
+        <div class="row" data-komm="${c.id}" style="cursor:pointer">${thumb(a,'sm')}<div style="flex:1;min-width:0"><b>${esc(a?a.name:'Artikel '+c.nr)}</b> · ${c.qty} mitgegeben
+          <div class="muted">${fmtDate(c.date)} · ${EUR(c.price)}/Stk.${c.note?' · '+esc(c.note):''}</div></div><span class="muted">✎</span></div>
+        <div class="ctl"><span class="lbl">Verkauft</span><span></span>${stepper('ks',c.id,c.sold,null,0)}</div>
+        <div class="ctl"><span class="lbl">Zurück ins Lager</span><span></span>${stepper('kr',c.id,c.returned,null,0)}</div>
+        <div class="ctl"><span class="lbl">Bezahlt (von ${c.sold} verkauft)</span><span></span>${stepper('kp',c.id,c.paid,null,0)}</div>
+        ${i.out?`<div class="muted" style="margin-top:6px">Noch unterwegs: <b>${i.out}</b></div><button class="btn sec big" data-act="kr-rest" data-id="${c.id}">Rest (${i.out}) zurück ins Lager</button>`:''}
+      </div>`; }).join('')}</div>`;
+  }
+  return h;
+}
+function openKommNew(){
+  mNr=null; mQty=1;
+  openModal(`<div class="mh"><h3>Ware mitgeben</h3><button class="x" data-act="modal-close">✕</button></div>
+    <label>An wen?</label><div class="sugg"><input id="k_person" placeholder="Name, z. B. Flohmarkt Oma" autocomplete="off"><div class="sugg-list" id="k_sugg"></div></div>
+    <label>Artikel</label><div id="k_art">${artPickBtn(null,'pick-komm')}</div>
+    <div class="inp-row"><div><label>Anzahl</label><div id="k_qty">${stepper('mq','x',mQty,null,1)}</div></div><div><label>Preis je Stück (€)</label><input id="k_price" inputmode="decimal"></div></div>
+    <label>Notiz (optional)</label><input id="k_note" placeholder="z. B. Flohmarkt Dorfplatz 15.11.">
+    <div id="k_hint" class="muted" style="margin-top:8px"></div>
+    <div class="btns"><button class="btn" data-act="komm-save">Mitgeben</button><button class="btn sec" data-act="modal-close">Abbrechen</button></div>`);
+}
+function updKommHint(){
+  const h=$('#k_hint'); if(!h) return; const a=mNr!=null?art(mNr):null;
+  h.innerHTML=a?`Frei im Lager: <b>${freeStock(a)}</b> Stk. ${mQty>freeStock(a)?'<span class="err">– nicht genug frei. Erst Gedrucktes ins Lager buchen.</span>':`→ danach ${freeStock(a)-mQty} frei`}`:'';
+}
+function saveKomm(){
+  const person=$('#k_person').value.trim(), a=mNr!=null?art(mNr):null, pr=num($('#k_price').value);
+  const errs=[]; if(!person) errs.push('Name fehlt'); if(!a) errs.push('Artikel wählen');
+  if(pr==null||Number.isNaN(pr)||pr<0) errs.push('Preis eingeben');
+  if(a && mQty>freeStock(a)) errs.push('Nicht genug frei im Lager ('+freeStock(a)+' Stk.)');
+  if(errs.length) return toast(errs.join(' · '), true);
+  a.stock-=mQty; logMove(a.nr,-mQty,'Mitgegeben an '+person);
+  S.consign.push({id:'k'+Date.now(),date:today(),person,nr:a.nr,qty:mQty,sold:0,returned:0,paid:0,price:pr,note:$('#k_note').value.trim()});
+  persist(); closeModal(); render(); toast(mQty+' Stk. an '+person+' mitgegeben');
+}
+function openKommEdit(id){
+  const c=S.consign.find(x=>x.id===id); if(!c) return; const a=art(c.nr);
+  openModal(`<div class="mh"><h3>Kommission</h3><button class="x" data-act="modal-close">✕</button></div>
+    <div class="row" style="justify-content:flex-start;gap:12px">${thumb(a)}<div><b>${esc(a?a.name:'')}</b><div class="muted">${c.qty} Stk. am ${fmtDate(c.date)} mitgegeben</div></div></div>
+    <label>An wen?</label><input id="ke_person" value="${esc(c.person)}">
+    <div class="inp-row"><div><label>Preis je Stück (€)</label><input id="ke_price" inputmode="decimal" value="${dec(c.price)}"></div><div><label>Datum</label><input id="ke_date" type="date" value="${c.date}"></div></div>
+    <label>Notiz</label><input id="ke_note" value="${esc(c.note)}">
+    <div class="btns"><button class="btn" data-act="komm-edit-save" data-id="${c.id}">Speichern</button><button class="btn sec" data-act="modal-close">Abbrechen</button>
+    <button class="btn danger" data-act="komm-del" data-id="${c.id}" style="margin-left:auto">Löschen</button></div>
+    <div class="muted" style="margin-top:8px">Löschen legt alle noch nicht verkauften Stücke zurück ins Lager.</div>`);
+}
+function openPrintStock(){
+  openPicker('Was wurde gedruckt?', articleItems(true), v=>{
+    mNr=v; mQty=1; const a=art(v);
+    openModal(`<div class="mh"><h3>🖨️ Gedruckt → ins Lager</h3><button class="x" data-act="modal-close">✕</button></div>
+      <div class="row" style="justify-content:flex-start;gap:12px">${thumb(a)}<div><b>${esc(a.name)}</b><div class="muted">Jetzt im Lager: ${a.stock||0} Stk.</div></div></div>
+      <label>Wie viele Stück?</label><div id="p_qty">${stepper('mq','x',mQty,null,1)}</div>
+      <div class="btns"><button class="btn" data-act="print-save">Ins Lager buchen</button><button class="btn sec" data-act="modal-close">Abbrechen</button></div>`);
+  });
+}
+
+function vLager(){
+  const tabs=`<div class="chips"><button class="chip ${lagerMode==='bestand'?'on':''}" data-act="lm" data-v="bestand">📦 Bestand</button><button class="chip ${lagerMode==='komm'?'on':''}" data-act="lm" data-v="komm">🤝 Kommission${kommSums().out?' ('+kommSums().out+')':''}</button><button class="chip ${lagerMode==='verlauf'?'on':''}" data-act="lm" data-v="verlauf">🕘 Verlauf</button></div>`;
+  if(lagerMode==='komm') return tabs+vKomm();
+  if(lagerMode==='verlauf') return tabs+`<div class="list">${moveRows(S.moves.slice(0,100))}</div><div class="muted" style="padding:0 4px">Die letzten 100 Lagerbewegungen. Gespeichert werden die letzten 200.</div>`;
+  const list=S.articles.filter(a=>lagerFilter==='alle'?a.active||(a.stock||0)>0:(a.stock||0)>0).sort((a,b)=>byName(a.name,b.name));
+  const n=S.articles.reduce((s,a)=>s+(a.stock||0),0);
+  const val=S.articles.reduce((s,a)=>s+(a.stock||0)*(usedPrice(a)||0),0);
+  return tabs+`<div class="kpis"><div class="kpi"><span>Stück im Lager</span><b>${n}</b></div><div class="kpi"><span>Warenwert</span><b>${EUR(val)}</b></div></div>
+    <button class="btn big" style="margin:4px 0 12px" data-act="print-stock">🖨️ Gedruckt → ins Lager</button>
+    <div class="card" style="padding:12px"><input id="lq" class="search" placeholder="🔍 Artikel suchen" autocomplete="off" style="margin:0"></div>
+    <div class="chips"><button class="chip ${lagerFilter==='alle'?'on':''}" data-act="lf" data-v="alle">Alle aktiven</button><button class="chip ${lagerFilter==='da'?'on':''}" data-act="lf" data-v="da">Nur vorhandene</button></div>
+    <div class="list" id="lagerlist">${lagerRows(list,'')}</div>
+    <div class="muted" style="padding:0 4px">„+1 gedruckt“ bei einer Bestellung legt das Stück ins Lager (reserviert), „+1 bezahlt“ bucht es wieder aus. Neue Bestellungen nehmen freie Stücke automatisch.</div>`;
+}
+function lagerRows(list,q){
+  q=(q||'').trim().toLowerCase();
+  const l=list.filter(a=>!q||(a.nr+' '+a.name+' '+a.variant).toLowerCase().includes(q));
+  return l.length?l.map(a=>`<div class="li"><span data-art="${a.nr}" style="cursor:pointer">${thumb(a)}</span><div class="t" data-art="${a.nr}" style="cursor:pointer"><b>${esc(a.name)}</b><small>${usedPrice(a)!=null?EUR(usedPrice(a)):'–'}${a.variant?' · '+esc(a.variant):''}${(reserved(a)||inKomm(a))?` · frei ${freeStock(a)}${reserved(a)?` · <b>${reserved(a)} reserviert</b>`:''}${inKomm(a)?` · ${inKomm(a)} unterwegs`:''}`:''}</small></div>${stepper('st',a.nr,a.stock||0,null,0)}</div>`).join(''):'<div class="empty">Nichts gefunden</div>';
+}
+
+function vArtikel(){
+  return `<div class="card" style="padding:12px"><input id="q" class="search" placeholder="🔍 Artikel suchen (Teil des Namens)" autocomplete="off" style="margin:0 0 10px">
+    <button class="btn big" style="margin:0" data-act="art-new">+ Neuer Artikel</button></div>
+    <div class="chips"><button class="chip ${artFilter==='aktiv'?'on':''}" data-act="af" data-v="aktiv">Aktive</button><button class="chip ${artFilter==='alle'?'on':''}" data-act="af" data-v="alle">Alle</button><button class="chip ${artFilter==='inaktiv'?'on':''}" data-act="af" data-v="inaktiv">Inaktive</button></div>
+    <div class="list" id="artlist">${artRows('')}</div>`;
+}
+function artRows(q){
+  q=(q||'').trim().toLowerCase();
+  const l=S.articles.filter(a=>(artFilter==='alle'||(artFilter==='aktiv'?a.active:!a.active)) && (!q||(a.nr+' '+a.name+' '+a.variant+' '+a.note).toLowerCase().includes(q))).sort((a,b)=>byName(a.name,b.name));
+  return l.length?l.map(a=>`<button class="li ${a.active?'':'off'}" data-art="${a.nr}">${thumb(a)}<span class="t"><b>${esc(a.name)}</b><small>Nr. ${a.nr}${a.variant?' · '+esc(a.variant):''} · Lager ${a.stock||0}</small></span>
+    <span style="text-align:right"><b>${usedPrice(a)!=null?EUR(usedPrice(a)):'–'}</b><br><span class="pill ${a.manual!=null?'':'ok'}" style="font-size:11px">${a.manual!=null?'manuell':'Automatik'}</span></span></button>`).join(''):'<div class="empty">Kein Artikel gefunden</div>';
+}
+
+function selectedItems(buyer){
+  return S.orders.filter(o=>o.buyer===buyer).map(o=>({o,i:info(o)})).filter(x=>x.i.ok&&x.i.billable>0).filter(x=>paySel[x.o.id]!==false);
+}
+function statement(buyer, items){
+  const lines=items.map(({o,i})=>`${fmtDate(o.date)} | ${itemName(o)} | ${i.billable} Stk. | ${EUR(i.u)} | ${EUR(i.billable*i.u)}`);
+  const tot=items.reduce((s,{i})=>s+i.billable*i.u,0);
+  return `Zahlungsübersicht – ${buyer} (Stand ${fmtDate(today())})\n${lines.join('\n')}\nGesamt: ${EUR(tot)}`;
+}
+function payBuyers(){ return buyers().filter(b=>S.orders.some(o=>o.buyer===b && info(o).billable>0 && info(o).ok)); }
+function vZahlen(){
+  const withOpen=payBuyers();
+  if(!withOpen.length) return `<div class="card empty">Keine gedruckten, unbezahlten Artikel. Alles beglichen. 👍</div>`;
+  if(!selBuyer || !withOpen.includes(selBuyer)) selBuyer=withOpen[0];
+  const items=S.orders.filter(o=>o.buyer===selBuyer).map(o=>({o,i:info(o)})).filter(x=>x.i.ok&&x.i.billable>0);
+  const total=items.filter(x=>paySel[x.o.id]!==false).reduce((s,{i})=>s+i.billable*i.u,0);
+  return `<div class="card"><label style="margin-top:0">Besteller</label>
+    <button class="picker-btn" data-act="pick-buyer"><div class="th">${esc(selBuyer.charAt(0).toUpperCase())}</div><span class="t"><b>${esc(selBuyer)}</b><small>${withOpen.length} Personen mit offenen Beträgen · antippen zum Wechseln</small></span><span class="muted">🔍</span></button>
+    <div class="muted" style="margin:10px 0 4px">Nur gedruckte, noch unbezahlte Stücke. Haken entfernen, wenn etwas nicht berechnet werden soll.</div>
+    ${items.map(({o,i})=>`<div class="check"><input type="checkbox" data-pay="${o.id}" ${paySel[o.id]!==false?'checked':''}>${thumb(i.a,'sm')}
+      <div style="flex:1;min-width:0"><div>${esc(itemName(o))}</div><div class="muted">${fmtDate(o.date)} · ${i.billable} Stk. à ${EUR(i.u)}</div></div><b>${EUR(i.billable*i.u)}</b></div>`).join('')}
+    <div class="row" style="margin-top:12px"><b>Gesamt</b><span class="big-num">${EUR(total)}</span></div>
+    <button class="btn big" data-act="copy-pay">Übersicht für WhatsApp kopieren</button>
+    <button class="btn sec big" data-act="mark-paid">Ausgewählte als bezahlt markieren</button></div>`;
+}
+
+function vMehr(){
+  const rows=S.orders.map(o=>({o,i:info(o)}));
+  const T=rows.reduce((t,{o,i})=>({qty:t.qty+o.qty,pr:t.pr+o.printed,pd:t.pd+o.paid,sum:t.sum+i.sum,got:t.got+i.got,open:t.open+i.open}),{qty:0,pr:0,pd:0,sum:0,got:0,open:0});
+  const byB={}; rows.forEach(({o,i})=>{ if(i.open>0){ byB[o.buyer]=byB[o.buyer]||{sum:0,n:0}; byB[o.buyer].sum+=i.open; byB[o.buyer].n++; } });
+  const bo=Object.entries(byB).sort((a,b)=>byName(a[0],b[0]));
+  const ar=S.articles.map(a=>{ const os=rows.filter(r=>r.o.nr===a.nr); return {a,q:os.reduce((s,r)=>s+r.o.qty,0),pr:os.reduce((s,r)=>s+r.o.printed,0),pd:os.reduce((s,r)=>s+r.o.paid,0),open:os.reduce((s,r)=>s+r.i.open,0)}; }).filter(x=>x.q>0).sort((a,b)=>byName(a.a.name,b.a.name));
+  const s=S.settings;
+  return `<details open><summary class="sumh">Kalkulator: Artikel berechnen</summary>
+  <div class="card" id="calc">
+    <label style="margin-top:0">Artikelname</label><input id="c_name" placeholder="z. B. Monitor Ghost">
+    ${photoField('calc',null)}
+    <div class="inp-row"><div><label>Variante</label><input id="c_var"></div><div><label>Notiz</label><input id="c_note"></div></div>
+    <div class="inp-row"><div><label>Rollenpreis (€)</label><input id="r_roll" inputmode="decimal"></div><div><label>Rolleninhalt (g)</label><input id="r_inh" inputmode="numeric" placeholder="${s.rolle}"></div></div>
+    <div class="inp-row"><div><label>Filament (g)</label><input id="r_fil" inputmode="decimal"></div><div><label>Sonstige Kosten (€)</label><input id="r_son" inputmode="decimal"></div></div>
+    <div class="inp-row"><div><label>Druckzeit Std.</label><input id="r_std" inputmode="decimal"></div><div><label>Druckzeit Min.</label><input id="r_min" inputmode="decimal"></div></div>
+    <div class="inp-row"><div><label>Zusatzteile (Anzahl)</label><input id="r_zn" inputmode="numeric"></div><div><label>Preis je Zusatzteil (€)</label><input id="r_zp" inputmode="decimal"></div></div>
+    <div class="inp-row"><div><label>Nacharbeit (Min.)</label><input id="r_nach" inputmode="numeric"></div><div><label>Schon im Lager (Stk.)</label><input id="c_stock" inputmode="numeric" placeholder="0"></div></div>
+    <div id="r_out" style="margin-top:12px"></div>
+    <button class="btn big" id="calc_btn" data-act="calc-new">Als neuen Artikel anlegen</button>
+    <div id="calc_msg" style="margin-top:8px;font-size:14px;font-weight:600"></div>
+  </div></details>
+  <details><summary class="sumh">Auswertung</summary>
+  <div class="kpis">
+    <div class="kpi"><span>Bestellt</span><b>${T.qty} Stk.</b></div><div class="kpi"><span>Gedruckt</span><b>${T.pr} Stk.</b></div>
+    <div class="kpi"><span>Bezahlt</span><b>${T.pd} Stk.</b></div><div class="kpi"><span>Bestellwert</span><b>${EUR(T.sum)}</b></div>
+    <div class="kpi"><span>Eingegangen</span><b>${EUR(T.got)}</b></div><div class="kpi hot"><span>Noch offen</span><b>${EUR(T.open)}</b></div></div></details>
+  <details><summary class="sumh">Offene Zahlungen nach Besteller</summary>
+  <div class="card">${bo.length?bo.map(([b,v])=>`<div class="row check"><span>${esc(b)} <span class="muted">(${v.n} Pos.)</span></span><b>${EUR(v.sum)}</b></div>`).join(''):'Keine offenen Zahlungen.'}</div></details>
+  <details><summary class="sumh">Je Artikel</summary>
+  <div class="card"><table><tr><th>Artikel</th><th class="r">Best.</th><th class="r">Gedr.</th><th class="r">Bez.</th><th class="r">Offen</th></tr>
+  ${ar.map(x=>`<tr><td>${esc(x.a.name)}</td><td class="r">${x.q}</td><td class="r">${x.pr}</td><td class="r">${x.pd}</td><td class="r">${EUR(x.open)}</td></tr>`).join('')}</table></div></details>
+  <details><summary class="sumh">Einstellungen Kalkulation</summary>
+  <div class="card">
+    <div class="inp-row"><div><label>Standardrolle (g)</label><input id="s_rolle" value="${s.rolle}"></div><div><label>Strompreis (€/kWh)</label><input id="s_strom" value="${dec(s.strom)}"></div></div>
+    <div class="inp-row"><div><label>Druckerleistung (W)</label><input id="s_watt" value="${s.watt}"></div><div><label>Verschleiß (€/Std.)</label><input id="s_verschl" value="${dec(s.verschl)}"></div></div>
+    <div class="inp-row"><div><label>Arbeitswert (€/Std.)</label><input id="s_arbeit" value="${dec(s.arbeit)}"></div><div><label>Ausschuss (%)</label><input id="s_ausschuss" value="${Math.round(s.ausschuss*100)}"></div></div>
+    <div class="inp-row"><div><label>Gewinnzuschlag (%)</label><input id="s_gewinn" value="${Math.round(s.gewinn*100)}"></div><div><label>Runden auf (€)</label><input id="s_runden" value="${dec(s.runden)}"></div></div>
+    <button class="btn big" data-act="settings-save">Einstellungen speichern</button>
+    <div class="muted" style="margin-top:8px">Änderungen wirken nicht auf bestehende Artikelpreise.</div></div></details>
+  <details><summary class="sumh">Datensicherung</summary>
+  <div class="card">
+    <div class="muted" style="font-size:14px">Die Daten liegen sicher in der Google-Tabelle. Zusätzlich wird dort einmal pro Woche (Montag früh) automatisch eine Kopie abgelegt (letzte 12 Wochen, ohne Fotos – nur wenige KB). Hier kannst du jederzeit eine eigene Sicherung aufs Handy oder den PC laden.</div>
+    <button class="btn big" data-act="backup-json">💾 Komplette Sicherung herunterladen</button>
+    <button class="btn sec big" data-act="backup-csv-o">📄 Bestellungen als Excel-Tabelle</button>
+    <button class="btn sec big" data-act="backup-csv-a">📦 Artikel &amp; Lager als Excel-Tabelle</button>
+  </div></details>
+  <details><summary class="sumh">Version ${APP_VERSION} ${(S.appBuild||0)>APP_BUILD?'· ⚠ veraltet':'· ✓ aktuell'}</summary>
+  <div class="card"><div class="row"><span>Diese App</span><b>Version ${APP_VERSION} vom ${APP_DATE}</b></div>
+    ${(S.appBuild||0)>APP_BUILD?`<div class="warn" style="margin-top:6px">Es gibt eine neuere Version.</div><button class="btn big" data-act="app-update">Jetzt aktualisieren</button>`:'<div class="muted" style="margin-top:6px">✓ Das ist die neueste Version, die in der Familie genutzt wird.</div>'}
+    <div class="muted" style="margin:12px 0 4px;font-weight:700">Was ist neu</div>
+    ${CHANGES.map(c=>`<div class="check" style="align-items:flex-start"><b style="min-width:34px">${c[0]}</b><span class="muted" style="font-size:13px">${esc(c[2])}</span></div>`).join('')}
+  </div></details>
+  <details><summary class="sumh">Als App auf dem Handy</summary>
+  <div class="card muted" style="font-size:14px">
+    <b>iPhone:</b> in Safari öffnen → Teilen-Symbol → „Zum Home-Bildschirm“.<br><br>
+    <b>Android:</b> in Chrome öffnen → Menü ⋮ → „App installieren“ bzw. „Zum Startbildschirm hinzufügen“.</div></details>`;
+}
+
+// Kalkulation (Formeln wie in der Original-Tabelle; Minuten werden berücksichtigt)
+function kalk(useMin){
+  const g=id=>num($('#'+id).value), s=S.settings;
+  const raw=[g('r_roll'),g('r_inh'),g('r_fil'),g('r_std'),g('r_min'),g('r_zn'),g('r_zp'),g('r_nach'),g('r_son')];
+  if(raw.some(v=>v!==null&&Number.isNaN(v))) return {err:'Bitte nur Zahlen eingeben.'};
+  const [roll,inhIn,fil0,std0,min0,zn0,zp0,nach0,son0]=raw;
+  if(roll==null) return {err:'Rollenpreis eingeben.'};
+  const inh=inhIn||s.rolle, fil=fil0||0, std=std0||0, min=min0||0, zn=zn0||0, zp=zp0||0, nach=nach0||0, son=son0||0;
+  if(inh<=0) return {err:'Rolleninhalt muss größer als 0 sein.'};
+  const h=std+(useMin===false?0:min/60);
+  const mat=roll/inh*fil*(1+s.ausschuss), zus=zn*zp, strom=h*s.strom*s.watt/1000, vers=h*s.verschl, arb=nach/60*s.arbeit;
+  const selb=mat+zus+strom+vers+arb+son, kal=selb*(1+s.gewinn), rund=Math.ceil(kal/s.runden-1e-9)*s.runden;
+  return {h,min,mat,zus,strom,vers,arb,son,selb,kal,rund};
+}
+function updCalc(){
+  const out=$('#r_out'); if(!out) return;
+  const r=kalk(); if(r.err){ out.innerHTML=`<span class="muted">${r.err}</span>`; return; }
+  let h=`<table>
+    <tr><td>Material inkl. Ausschuss</td><td class="r">${EUR(r.mat)}</td></tr><tr><td>Zusatzteile</td><td class="r">${EUR(r.zus)}</td></tr>
+    <tr><td>Strom (${r.h.toFixed(2).replace('.',',')} Std.)</td><td class="r">${EUR(r.strom)}</td></tr><tr><td>Verschleiß</td><td class="r">${EUR(r.vers)}</td></tr>
+    <tr><td>Arbeit</td><td class="r">${EUR(r.arb)}</td></tr><tr><td>Sonstiges</td><td class="r">${EUR(r.son)}</td></tr>
+    <tr><td><b>Selbstkosten</b></td><td class="r"><b>${EUR(r.selb)}</b></td></tr><tr><td>Kalkuliert (inkl. Gewinn)</td><td class="r">${EUR(r.kal)}</td></tr>
+    <tr><td><b>Verkaufspreis gerundet</b></td><td class="r"><span class="big-num" style="font-size:20px">${EUR(r.rund)}</span></td></tr></table>`;
+  if(r.min>0){ const o=kalk(false); h+=`<div class="warn" style="margin-top:6px">Hinweis: Die Tabelle berücksichtigt Minuten bei Strom und Verschleiß bisher nicht. Ohne Minuten wäre der Preis ${EUR(o.rund)}. Hier werden die Minuten genutzt.</div>`; }
+  out.innerHTML=h;
+}
+function calcMsg(t,bad){ const m=$('#calc_msg'); if(m){ m.textContent=t; m.style.color=bad?'var(--bad)':'var(--ok)'; } }
+
+/* ================= Rendern ================= */
+function render(){
+  const f={start:vStart,neu:vNeu,lager:vLager,artikel:vArtikel,zahlen:vZahlen,mehr:vMehr}[tab];
+  const outdated=(S.appBuild||0)>APP_BUILD;
+  $('#view').innerHTML=(outdated?`<div class="card" style="background:var(--warnbg);border-color:transparent"><b>🔄 Neue App-Version verfügbar</b><div class="muted" style="margin:4px 0 8px">Ein anderes Gerät nutzt schon eine neuere Version. Bitte kurz aktualisieren, damit alle gleich arbeiten.</div><button class="btn" data-act="app-update">Jetzt aktualisieren</button></div>`:'')+f();
+  document.querySelectorAll('#nav button').forEach(b=>b.classList.toggle('on',b.dataset.tab===tab));
+  if(tab==='neu') updNeu();
+  if(tab==='mehr') updCalc();
+  setStatus(); hydrateImgs();
+}
+function openModal(html){ $('#modalBody').innerHTML=html; $('#modal').style.display='block'; hydrateImgs(); }
+function closeModal(){ $('#modal').style.display='none'; delArmed=false; delete pendingImg.edit; delete pendingImg.new; }
+
+/* ----- Such-Auswahl (Artikel / Besteller) ----- */
+let pick=null;
+function openPicker(title, items, onPick){
+  pick={items,onPick};
+  $('#pickerBody').innerHTML=`<div class="mh"><h3>${esc(title)}</h3><button class="x" data-act="picker-close" aria-label="schließen">✕</button></div>
+    <input id="pk_q" class="search" placeholder="🔍 Suchen…" autocomplete="off"><div class="list" id="pk_list" style="box-shadow:none;border:1px solid var(--line)"></div>`;
+  $('#picker').style.display='block'; renderPick('');
+  setTimeout(()=>{ const q=$('#pk_q'); if(q) q.focus(); },60);
+}
+function renderPick(q){
+  q=q.trim().toLowerCase();
+  const l=pick.items.filter(i=>!q||i.search.includes(q));
+  $('#pk_list').innerHTML=l.length?l.slice(0,300).map((i,ix)=>`<button class="li" data-pick="${pick.items.indexOf(i)}">${i.thumb}<span class="t"><b>${esc(i.label)}</b>${i.sub?`<small>${esc(i.sub)}</small>`:''}</span></button>`).join(''):'<div class="empty">Nichts gefunden</div>';
+  hydrateImgs();
+}
+function closePicker(){ $('#picker').style.display='none'; pick=null; }
+function articleItems(onlyActive){
+  return S.articles.filter(a=>!onlyActive||a.active).sort((a,b)=>byName(a.name,b.name)).map(a=>({value:a.nr,label:a.nr+'. '+a.name,
+    sub:`${usedPrice(a)!=null?EUR(usedPrice(a)):'kein Preis'} · Lager ${a.stock||0}${a.variant?' · '+a.variant:''}${a.active?'':' · inaktiv'}`,
+    thumb:thumb(a), search:(a.nr+' '+a.name+' '+a.variant+' '+a.note).toLowerCase()}));
+}
+
+/* ----- Bestellung bearbeiten ----- */
+function openEdit(id){
+  const o=S.orders.find(x=>x.id===id); if(!o) return;
+  editNr=o.nr;
+  openModal(`<div class="mh"><h3>Bestellung bearbeiten</h3><button class="x" data-act="modal-close">✕</button></div>
+    <label>Besteller</label><input id="e_buyer" value="${esc(o.buyer)}">
+    <label>Artikel</label><div id="e_art">${artPickBtn(o.nr,'pick-edit')}</div>
+    <div class="inp-row"><div><label>Datum</label><input id="e_date" type="date" value="${o.date}"></div><div><label>Variante</label><input id="e_var" value="${esc(o.variant)}"></div></div>
+    <div class="inp-row">
+      <div><label>Bestellt</label><input id="e_qty" inputmode="numeric" value="${o.qty}"></div>
+      <div><label>Gedruckt</label><input id="e_pr" inputmode="numeric" value="${o.printed}"></div>
+      <div><label>Bezahlt</label><input id="e_pd" inputmode="numeric" value="${o.paid}"></div></div>
+    ${o.inStock?`<div class="muted" style="margin-top:6px">📦 ${o.inStock} Stk. liegen für diese Bestellung im Lager bereit.</div>`:''}
+    <label>Manueller Stückpreis (leer = Artikelpreis)</label><input id="e_man" inputmode="decimal" value="${o.manual==null?'':dec(o.manual)}">
+    <label>Notiz</label><input id="e_note" value="${esc(o.note)}">
+    <div class="btns"><button class="btn" data-act="edit-save" data-id="${o.id}">Speichern</button><button class="btn sec" data-act="modal-close">Abbrechen</button>
+    <button class="btn danger" data-act="edit-del" data-id="${o.id}" style="margin-left:auto">Löschen</button></div>`);
+}
+function saveEdit(id){
+  const o=S.orders.find(x=>x.id===id); if(!o) return;
+  const buyer=$('#e_buyer').value.trim(), qty=num($('#e_qty').value), pr=num($('#e_pr').value), pd=num($('#e_pd').value), man=num($('#e_man').value);
+  const errs=[];
+  if(!buyer) errs.push('Besteller fehlt');
+  if(!(qty>=1&&Number.isInteger(qty))) errs.push('Bestellt: ganze Zahl ≥ 1');
+  if(!(pr>=0&&pr<=qty&&Number.isInteger(pr))) errs.push('Gedruckt: 0 bis Bestellt');
+  if(!(pd>=0&&pd<=qty&&Number.isInteger(pd))) errs.push('Bezahlt: 0 bis Bestellt');
+  if(man!==null&&(Number.isNaN(man)||man<0)) errs.push('Manueller Preis ungültig');
+  if(errs.length) return toast(errs.join(' · '), true);
+  if(editNr!==o.nr){ o.legacy=Math.max(0,o.printed-o.paid); o.inStock=0; o.nr=editNr; } // anderer Artikel: Reservierung lösen, Lager unverändert
+  setPP(o, pr, pd);
+  Object.assign(o,{buyer,date:$('#e_date').value||o.date,variant:$('#e_var').value.trim(),qty,manual:man,note:$('#e_note').value.trim()});
+  persist(); closeModal(); render(); toast('Gespeichert');
+}
+function saveNew(){
+  const buyer=$('#f_buyer').value.trim(), a=newNr!=null?art(newNr):null, m=num($('#f_manual').value);
+  const errs=[];
+  if(!buyer) errs.push('Besteller fehlt');
+  if(!a) errs.push('Artikel wählen');
+  if(m!==null&&(Number.isNaN(m)||m<0)) errs.push('Manueller Preis ungültig');
+  if(a&&m==null&&usedPrice(a)==null) errs.push('Artikel hat keinen Preis – bitte manuell eingeben');
+  if(errs.length) return toast(errs.join(' · '), true);
+  const o={id:'o'+Date.now(),date:$('#f_date').value||today(),buyer,nr:a.nr,variant:$('#f_var').value.trim(),manual:m,qty:newQty,printed:0,paid:0,note:$('#f_note').value.trim(),inStock:0,legacy:0};
+  const take=takeFromStock(o);
+  S.orders.push(o); newNr=null; newQty=1;
+  persist(); tab='start'; render(); window.scrollTo(0,0);
+  toast('Bestellung gespeichert'+(take?` · ${take} Stk. aus dem Lager`:''));
+}
+
+/* ----- Artikel ----- */
+function openArt(nr){
+  const a=art(nr); if(!a) return;
+  const rw=richtwert(a);
+  openModal(`<div class="mh"><h3>Artikel ${a.nr}</h3><button class="x" data-act="modal-close">✕</button></div>
+    ${photoField('edit',a)}
+    <label>Name</label><input id="a_name" value="${esc(a.name)}">
+    <div class="inp-row"><div><label>Variante</label><input id="a_var" value="${esc(a.variant)}"></div><div><label>Lagerbestand</label><input id="a_stock" inputmode="numeric" value="${a.stock||0}"></div></div>
+    <label>Notiz</label><input id="a_note" value="${esc(a.note)}">
+    <div class="card" style="background:var(--soft);box-shadow:none;margin:12px 0 0">
+      <div class="row"><span>Verkaufspreis</span><b style="font-size:18px">${usedPrice(a)!=null?EUR(usedPrice(a)):'–'}</b></div>
+      <div class="muted">kalkuliert ${a.calc==null?'–':EUR(a.calc)}${rw!=null?` · Richtwert ab 3 Stk.: ${EUR(rw)}`:''}</div></div>
+    <label>Lager</label><div class="muted">Gesamt <b>${a.stock||0}</b> · frei <b>${freeStock(a)}</b> · reserviert <b>${reserved(a)}</b> · unterwegs <b>${inKomm(a)}</b></div>
+    ${S.moves.some(m=>m.nr===a.nr)?`<details style="margin-top:6px"><summary class="muted" style="cursor:pointer">🕘 Letzte Lagerbewegungen</summary><div class="list" style="box-shadow:none;margin-top:6px">${moveRows(S.moves.filter(m=>m.nr===a.nr).slice(0,10))}</div></details>`:''}
+    <label>Manueller Preis (leer = Automatik)</label><input id="a_man" inputmode="decimal" value="${a.manual==null?'':dec(a.manual)}">
+    <label style="display:flex;align-items:center;gap:10px;margin-top:14px"><input type="checkbox" id="a_active" ${a.active?'checked':''} style="width:22px;height:22px">Aktiv (wird bei neuen Bestellungen angeboten)</label>
+    <div class="btns"><button class="btn" data-act="art-save" data-nr="${a.nr}">Speichern</button><button class="btn sec" data-act="modal-close">Abbrechen</button></div>`);
+}
+async function saveArt(nr, btn){
+  const a=art(nr); if(!a) return;
+  const name=$('#a_name').value.trim(), man=num($('#a_man').value), st=num($('#a_stock').value);
+  if(!name) return toast('Name fehlt', true);
+  if(man!==null&&(Number.isNaN(man)||man<0)) return toast('Preis ungültig', true);
+  if(!(st!==null&&Number.isInteger(st)&&st>=0)) return toast('Lagerbestand: ganze Zahl ≥ 0', true);
+  if(st<reserved(a)) return toast(reserved(a)+' Stk. sind für Bestellungen reserviert – Lager kann nicht kleiner sein', true);
+  btn.disabled=true;
+  const ok=await applyPhoto(a,'edit');
+  btn.disabled=false; if(!ok) return;
+  logMove(a.nr,st-(a.stock||0),'Bestand von Hand geändert');
+  Object.assign(a,{name,variant:$('#a_var').value.trim(),note:$('#a_note').value.trim(),manual:man,stock:st,active:$('#a_active').checked});
+  persist(); closeModal(); render(); toast('Artikel gespeichert');
+}
+function openArtNew(){
+  openModal(`<div class="mh"><h3>Neuer Artikel</h3><button class="x" data-act="modal-close">✕</button></div>
+    ${photoField('new',null)}
+    <label>Name</label><input id="n_name">
+    <div class="inp-row"><div><label>Verkaufspreis (€)</label><input id="n_price" inputmode="decimal"></div><div><label>Im Lager (Stk.)</label><input id="n_stock" inputmode="numeric" placeholder="0"></div></div>
+    <label>Variante (optional)</label><input id="n_var">
+    <label>Notiz (optional)</label><input id="n_note">
+    <div class="muted" style="margin-top:8px">Für einen kalkulierten Preis den Kalkulator unter „Mehr“ nutzen.</div>
+    <div class="btns"><button class="btn" data-act="art-new-save">Anlegen</button><button class="btn sec" data-act="modal-close">Abbrechen</button></div>`);
+}
+async function saveArtNew(btn){
+  const name=$('#n_name').value.trim(), p=num($('#n_price').value), st=num($('#n_stock').value)||0;
+  if(!name) return toast('Name fehlt', true);
+  if(p==null||Number.isNaN(p)||p<0) return toast('Verkaufspreis eingeben', true);
+  if(!(Number.isInteger(st)&&st>=0)) return toast('Lager: ganze Zahl ≥ 0', true);
+  const a={nr:nextNr(),name,variant:$('#n_var').value.trim(),calc:null,manual:p,active:true,note:$('#n_note').value.trim(),N:null,O:null,S:null,stock:st,img:null};
+  btn.disabled=true; await applyPhoto(a,'new'); btn.disabled=false;
+  S.articles.push(a); persist(); closeModal(); render(); toast('Artikel '+a.nr+' angelegt');
+}
+async function calcNew(btn){
+  const k=kalk();
+  if(k.err || !(k.h>0)){ calcMsg(k.err||'Bitte Druckzeit eingeben (z. B. 1,5 Std.).', true); return; }
+  const name=($('#c_name').value||'').trim();
+  if(!name){ calcMsg('Bitte oben einen Artikelnamen eintragen.', true); $('#c_name').focus(); return; }
+  const st=num($('#c_stock').value)||0;
+  if(!(Number.isInteger(st)&&st>=0)){ calcMsg('Lager: ganze Zahl ≥ 0', true); return; }
+  const a={nr:nextNr(),name,variant:($('#c_var').value||'').trim(),calc:k.rund,manual:null,active:true,note:($('#c_note').value||'').trim(),N:k.strom,O:k.vers,S:k.kal,stock:st,img:null};
+  btn.disabled=true; await applyPhoto(a,'calc'); btn.disabled=false;
+  S.articles.push(a); persist(); tab='artikel'; artFilter='aktiv'; render(); window.scrollTo(0,0);
+  toast('Artikel '+a.nr+' „'+name+'“ angelegt ('+EUR(k.rund)+')');
+}
+
+/* ----- Sicherung ----- */
+function download(blob, name){
+  const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=name;
+  document.body.appendChild(a); a.click(); setTimeout(()=>{ URL.revokeObjectURL(a.href); a.remove(); }, 1500);
+}
+function csv(rows){ return '﻿'+rows.map(r=>r.map(v=>'"'+String(v==null?'':v).replace(/"/g,'""')+'"').join(';')).join('\r\n'); }
+function backup(kind){
+  const d=today();
+  if(kind==='json') return download(new Blob([JSON.stringify(S,null,1)],{type:'application/json'}), `3D-Druck-Sicherung-${d}.json`);
+  if(kind==='o'){
+    const rows=[['Datum','Besteller','Artikel-Nr.','Artikel','Variante','Menge','Gedruckt','Bezahlt','Stückpreis','Summe','Offen','Bereit im Lager','Notiz']];
+    S.orders.slice().sort((a,b)=>a.date.localeCompare(b.date)).forEach(o=>{ const i=info(o); rows.push([fmtDate(o.date),o.buyer,o.nr,i.a?i.a.name:'',o.variant,o.qty,o.printed,o.paid,i.ok?dec(i.u):'',i.ok?dec(i.sum):'',dec(i.open),o.inStock||0,o.note]); });
+    return download(new Blob([csv(rows)],{type:'text/csv'}), `3D-Druck-Bestellungen-${d}.csv`);
+  }
+  const rows=[['Nr.','Name','Variante','Verkaufspreis','Kalkuliert','Manuell','Lager','Aktiv','Notiz']];
+  S.articles.slice().sort((a,b)=>a.nr-b.nr).forEach(a=>rows.push([a.nr,a.name,a.variant,usedPrice(a)!=null?dec(usedPrice(a)):'',a.calc!=null?dec(a.calc):'',a.manual!=null?dec(a.manual):'',a.stock||0,a.active?'ja':'nein',a.note]));
+  download(new Blob([csv(rows)],{type:'text/csv'}), `3D-Druck-Artikel-${d}.csv`);
+}
+
+async function copyText(t){
+  try{ await navigator.clipboard.writeText(t); toast('Kopiert – jetzt in WhatsApp einfügen'); }
+  catch(e){ openModal(`<div class="mh"><h3>Bitte manuell kopieren</h3><button class="x" data-act="modal-close">✕</button></div><textarea style="height:240px;font-size:14px">${esc(t)}</textarea>`); }
+}
+
+/* ================= Aktionen ================= */
+function act(name, el){
+  const d=el.dataset, o=d.id?S.orders.find(x=>x.id===d.id):null;
+  switch(name){
+    case 'pr+': if(o&&o.printed<o.qty){ setPP(o,o.printed+1,o.paid); persist(); render(); toast('Gedruckt – liegt jetzt im Lager bereit'); } break;
+    case 'pr-': if(o&&o.printed>0){ setPP(o,o.printed-1,o.paid); persist(); render(); } break;
+    case 'pd+': if(o&&o.paid<o.qty){ const held=o.printed>o.paid; setPP(o,o.printed,o.paid+1); persist(); render(); if(held) toast('Bezahlt – aus dem Lager abgebucht'); } break;
+    case 'pd-': if(o&&o.paid>0){ setPP(o,o.printed,o.paid-1); persist(); render(); } break;
+    case 'st+': case 'st-': { const a=art(d.id); if(!a) break;
+      if(name==='st-' && (a.stock||0)<=reserved(a)) return toast('Die restlichen Stücke sind für Bestellungen reserviert', true);
+      const before=a.stock||0; a.stock=Math.max(0,before+(name==='st+'?1:-1)); logMove(a.nr,a.stock-before,'Von Hand korrigiert'); persist();
+      const q=$('#lq'); $('#lagerlist').innerHTML=lagerRows(S.articles.filter(x=>lagerFilter==='alle'?x.active||(x.stock||0)>0:(x.stock||0)>0).sort((x,y)=>byName(x.name,y.name)), q?q.value:''); hydrateImgs(); break; }
+    case 'nq+': newQty++; $('#view').querySelector('[data-act="nq-"]').parentElement.outerHTML=stepper('nq','x',newQty,null,1); updNeu(); break;
+    case 'nq-': if(newQty>1){ newQty--; $('#view').querySelector('[data-act="nq-"]').parentElement.outerHTML=stepper('nq','x',newQty,null,1); updNeu(); } break;
+    case 'lf': lagerFilter=d.v; render(); break;
+    case 'lm': lagerMode=d.v; render(); break;
+    case 'kf': kommFilter=d.v; render(); break;
+    case 'komm-new': openKommNew(); break;
+    case 'pick-komm': openPicker('Artikel mitgeben', articleItems(true), v=>{ mNr=v; $('#k_art').innerHTML=artPickBtn(v,'pick-komm'); const a=art(v); const p=$('#k_price'); if(p&&!p.value&&usedPrice(a)!=null) p.value=dec(usedPrice(a)); updKommHint(); hydrateImgs(); }); break;
+    case 'mq+': case 'mq-': { if(name==='mq+') mQty++; else if(mQty>1) mQty--; const box=$('#k_qty')||$('#p_qty'); if(box) box.innerHTML=stepper('mq','x',mQty,null,1); updKommHint(); break; }
+    case 'komm-save': saveKomm(); break;
+    case 'print-stock': openPrintStock(); break;
+    case 'print-save': { const a=art(mNr); if(!a) break; a.stock=(a.stock||0)+mQty; logMove(a.nr,mQty,'Gedruckt fürs Lager'); persist(); closeModal(); render(); toast(mQty+' Stk. „'+a.name+'“ ins Lager gebucht'); break; }
+    case 'ks+': case 'ks-': case 'kr+': case 'kr-': case 'kp+': case 'kp-': case 'kr-rest': {
+      const c=S.consign.find(x=>x.id===d.id); if(!c) break; const a=art(c.nr), free=c.qty-c.sold-c.returned;
+      if(name==='ks+'){ if(free<=0) return toast('Alle Stücke sind schon verkauft oder zurück', true); c.sold++; }
+      if(name==='ks-'){ if(c.sold<=0) break; c.sold--; c.paid=Math.min(c.paid,c.sold); }
+      if(name==='kr+'){ if(free<=0) return toast('Alle Stücke sind schon verkauft oder zurück', true); c.returned++; if(a) a.stock=(a.stock||0)+1; logMove(c.nr,1,'Zurück von '+c.person); }
+      if(name==='kr-'){ if(c.returned<=0) break; if(!a||(a.stock||0)<1) return toast('Das Stück ist nicht mehr im Lager', true); c.returned--; a.stock--; logMove(c.nr,-1,'Rückgabe korrigiert – '+c.person); }
+      if(name==='kr-rest'){ if(free<=0) break; c.returned+=free; if(a) a.stock=(a.stock||0)+free; logMove(c.nr,free,'Rest zurück von '+c.person); toast(free+' Stk. zurück im Lager'); }
+      if(name==='kp+'){ if(c.paid>=c.sold) return toast('Erst als verkauft markieren', true); c.paid++; }
+      if(name==='kp-'){ if(c.paid<=0) break; c.paid--; }
+      persist(); render(); break;
+    }
+    case 'komm-edit-save': { const c=S.consign.find(x=>x.id===d.id); if(!c) break; const p=$('#ke_person').value.trim(), pr=num($('#ke_price').value);
+      if(!p) return toast('Name fehlt', true); if(pr==null||Number.isNaN(pr)||pr<0) return toast('Preis ungültig', true);
+      Object.assign(c,{person:p,price:pr,date:$('#ke_date').value||c.date,note:$('#ke_note').value.trim()}); persist(); closeModal(); render(); toast('Gespeichert'); break; }
+    case 'komm-del': if(!delArmed){ delArmed=true; el.textContent='Wirklich löschen?'; } else { const c=S.consign.find(x=>x.id===d.id); if(c){ const a=art(c.nr), back=c.qty-c.sold-c.returned; if(a&&back>0){ a.stock=(a.stock||0)+back; logMove(c.nr,back,'Kommission gelöscht – '+c.person); } S.consign=S.consign.filter(x=>x.id!==c.id); } persist(); closeModal(); render(); toast('Gelöscht'); } break;
+    case 'af': artFilter=d.v; render(); break;
+    case 'pick-new': openPicker('Artikel wählen', articleItems(true), v=>{ newNr=v; const btn=$('[data-act="pick-new"]'); if(btn) btn.outerHTML=artPickBtn(newNr,'pick-new'); const a=art(v); $('#f_var').value=a?a.variant||'':''; updNeu(); hydrateImgs(); }); break;
+    case 'pick-edit': openPicker('Artikel wählen', articleItems(false), v=>{ editNr=v; $('#e_art').innerHTML=artPickBtn(v,'pick-edit'); hydrateImgs(); }); break;
+    case 'pick-buyer': openPicker('Besteller wählen', payBuyers().map(b=>({value:b,label:b,sub:'',thumb:`<div class="th">${esc(b.charAt(0).toUpperCase())}</div>`,search:b.toLowerCase()})), v=>{ selBuyer=v; paySel={}; render(); }); break;
+    case 'picker-close': closePicker(); break;
+    case 'edit-save': saveEdit(d.id); break;
+    case 'edit-del': if(!delArmed){ delArmed=true; el.textContent='Wirklich löschen?'; } else { S.orders=S.orders.filter(x=>x.id!==d.id); persist(); closeModal(); render(); toast(o.inStock?'Gelöscht – '+o.inStock+' gedruckte Stk. bleiben frei im Lager':'Bestellung gelöscht'); } break;
+    case 'modal-close': closeModal(); break;
+    case 'save-new': saveNew(); break;
+    case 'richtwert': $('#f_manual').value=d.v; updNeu(); break;
+    case 'copy-pay': { const it=selectedItems(selBuyer); if(!it.length) return toast('Keine Positionen ausgewählt', true); copyText(statement(selBuyer,it)); break; }
+    case 'mark-paid': { const it=selectedItems(selBuyer); if(!it.length) return toast('Keine Positionen ausgewählt', true); it.forEach(({o,i})=>{ setPP(o,o.printed,Math.min(o.qty,o.paid+i.billable)); }); paySel={}; persist(); render(); toast('Als bezahlt markiert'); break; }
+    case 'pay-all': S.orders.filter(x=>x.buyer===d.buyer).forEach(x=>{ setPP(x,x.printed,Math.max(x.paid,Math.min(x.qty,x.printed))); }); persist(); render(); toast('Als bezahlt markiert: '+d.buyer); break;
+    case 'art-save': saveArt(Number(d.nr), el); break;
+    case 'art-new': openArtNew(); break;
+    case 'art-new-save': saveArtNew(el); break;
+    case 'calc-new': calcNew(el).catch(e=>calcMsg('Fehler: '+e.message, true)); break;
+    case 'app-update': (async()=>{ try{ const rs=await navigator.serviceWorker?.getRegistrations?.(); for(const r of (rs||[])) await r.update(); const ks=await caches?.keys?.(); for(const k of (ks||[])) await caches.delete(k); }catch(e){} location.reload(); })(); break;
+    case 'backup-json': backup('json'); toast('Sicherung wird heruntergeladen'); break;
+    case 'backup-csv-o': backup('o'); toast('Tabelle wird heruntergeladen'); break;
+    case 'backup-csv-a': backup('a'); toast('Tabelle wird heruntergeladen'); break;
+    case 'photo-del': pendingImg[d.t]=''; rerenderPhoto(d.t); break;
+    case 'sugg': { const inp=$('#'+(d.t||'f_buyer')); if(inp) inp.value=d.v; el.parentElement.style.display='none'; break; }
+    case 'settings-save': {
+      const g=id=>num($('#'+id).value);
+      const v={rolle:g('s_rolle'),strom:g('s_strom'),watt:g('s_watt'),verschl:g('s_verschl'),arbeit:g('s_arbeit'),ausschuss:(g('s_ausschuss')||0)/100,gewinn:(g('s_gewinn')||0)/100,runden:g('s_runden')};
+      if(Object.values(v).some(x=>x==null||Number.isNaN(x)||x<0)||!(v.runden>0)||!(v.rolle>0)) return toast('Bitte alle Einstellungen als gültige Zahlen eintragen', true);
+      S.settings=v; persist(); render(); toast('Einstellungen gespeichert'); break;
+    }
+  }
+}
+function rerenderPhoto(t){
+  const input=document.querySelector(`[data-photo="${t}"]`); if(!input) return;
+  const box=input.closest('.photo'); const lab=box.previousElementSibling;
+  const a = t==='edit' ? art(Number(($('[data-act="art-save"]')||{dataset:{}}).dataset.nr)) : null;
+  const tmp=document.createElement('div'); tmp.innerHTML=photoField(t,a);
+  lab.remove(); box.replaceWith(...tmp.childNodes); hydrateImgs();
+}
+
+document.addEventListener('click', e=>{
+  const nb=e.target.closest('#nav [data-tab]');
+  if(nb){ tab=nb.dataset.tab; render(); window.scrollTo(0,0); return; }
+  const pk=e.target.closest('[data-pick]');
+  if(pk && pick){ const it=pick.items[Number(pk.dataset.pick)], cb=pick.onPick; closePicker(); cb(it.value); return; }
+  const ab=e.target.closest('[data-act]');
+  if(ab && !ab.disabled){ try{ act(ab.dataset.act, ab); }catch(err){ toast('Fehler: '+err.message, true); } return; }
+  const ar=e.target.closest('[data-art]'); if(ar){ openArt(Number(ar.dataset.art)); return; }
+  const km=e.target.closest('[data-komm]'); if(km){ openKommEdit(km.dataset.komm); return; }
+  const ed=e.target.closest('[data-edit]'); if(ed){ openEdit(ed.dataset.edit); return; }
+  if(e.target.id==='picker') closePicker();
+  if(!e.target.closest('.sugg')){ document.querySelectorAll('.sugg-list').forEach(s=>s.style.display='none'); }
+});
+document.addEventListener('input', e=>{
+  const t=e.target;
+  if(t.id==='q'){ $('#artlist').innerHTML=artRows(t.value); hydrateImgs(); return; }
+  if(t.id==='lq'){ $('#lagerlist').innerHTML=lagerRows(S.articles.filter(x=>lagerFilter==='alle'?x.active||(x.stock||0)>0:(x.stock||0)>0).sort((x,y)=>byName(x.name,y.name)), t.value); hydrateImgs(); return; }
+  if(t.id==='pk_q'){ renderPick(t.value); return; }
+  if(t.id==='f_buyer' || t.id==='k_person'){
+    const q=t.value.trim().toLowerCase(), l=$(t.id==='f_buyer'?'#f_sugg':'#k_sugg');
+    const pool=[...new Set([...buyers(), ...S.consign.map(c=>c.person)])].sort(byName);
+    const m=q?pool.filter(b=>b.toLowerCase().includes(q)&&b.toLowerCase()!==q).slice(0,8):[];
+    l.innerHTML=m.map(b=>`<button data-act="sugg" data-t="${t.id}" data-v="${esc(b)}">${esc(b)}</button>`).join(''); l.style.display=m.length?'block':'none'; return;
+  }
+  if(t.closest('#calc')){ updCalc(); return; }
+  if(tab==='neu' && t.closest('#view')) updNeu();
+});
+document.addEventListener('change', async e=>{
+  const t=e.target;
+  if(t.dataset && t.dataset.pay){ paySel[t.dataset.pay]=t.checked; render(); return; }
+  if(t.dataset && t.dataset.photo && t.files && t.files[0]){
+    const target=t.dataset.photo, file=t.files[0]; t.value='';
+    try{ pendingImg[target]=await readImage(file); rerenderPhoto(target); toast('Foto übernommen – zum Speichern unten auf „Speichern“ bzw. „Anlegen“ tippen'); }
+    catch(err){ toast(err.message, true); }
+  }
+});
+
+/* ================= Start & Abgleich ================= */
+function busy(){
+  if($('#modal').style.display==='block' || $('#picker').style.display==='block') return true;
+  const ae=document.activeElement;
+  if(ae && /^(INPUT|SELECT|TEXTAREA)$/.test(ae.tagName) && ae.closest('#view')) return true;
+  if(tab==='neu' && (newNr!=null || ($('#f_buyer')&&$('#f_buyer').value.trim()))) return true;
+  if(tab==='mehr' && [...document.querySelectorAll('#calc input')].some(i=>i.type!=='file'&&i.value.trim()!=='')) return true;
+  if(tab==='mehr' && pendingImg.calc) return true;
+  return false;
+}
+async function poll(){
+  if(saving) return;
+  try{
+    const txt=await call('getState');
+    if(!live){ live=true; setStatus(); }
+    if(dirty){ flush(); return; }
+    if(!txt) return;
+    const x=JSON.parse(txt);
+    if(!x||!x.orders||(x.rev||0)<=(S.rev||0)) return;
+    if(busy()) return;
+    adopt(x); render();
+  }catch(e){ if(live){ live=false; setStatus(); } }
+}
+async function init(){
+  document.body.classList.toggle('nl', /netlify\.app$/.test(location.hostname)); // Platz für den Netlify-Hinweis unten
+  let local=null, lbase=null;
+  try{ local=JSON.parse(localStorage.getItem(LKEY)||'null'); lbase=JSON.parse(localStorage.getItem(LKEY+'-base')||'null'); }catch(e){}
+  const unsaved = !!(local && local.orders && lbase && !same(local,lbase)); // Änderungen, die z. B. offline nicht mehr gespeichert wurden
+  S=normalize((local&&local.orders)?local:defaults());
+  if(lbase) BASE=lbase;
+  render();
+  try{
+    const txt=await call('getState');
+    live=true;
+    if(txt){
+      const remote=normalize(JSON.parse(txt));
+      if(unsaved){ S=mergeState(BASE, S, remote); setBase(remote); saveLocal(); dirty=true; flush(); }
+      else adopt(remote);
+      if((S.appBuild||0)<APP_BUILD){ dirty=true; flush(); }   // neuere Version einmalig bekannt machen
+    }
+    else {
+      // Tabelle leer: allererstes Laden → Startdaten schreiben (Server schreibt nur, wenn noch nichts gespeichert ist)
+      S.rev=0;
+      const r=await call('saveState', JSON.stringify(S), 0);
+      if(r&&r.ok) S.rev=r.rev; else if(r&&r.conflict) adopt(JSON.parse(r.state));
+      saveLocal();
+    }
+  }catch(e){ live=false; toast('Gemeinsame Tabelle nicht erreichbar. Anzeige aus lokaler Kopie.', true); }
+  render();
+  setInterval(poll, POLL_MS);
+  document.addEventListener('visibilitychange', ()=>{ if(!document.hidden) poll(); });
+}
+init();
+</script>
+</body>
+</html>
