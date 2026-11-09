@@ -163,8 +163,9 @@ const API_URL = 'https://script.google.com/macros/s/AKfycbzCOCM_-jRAiI1YzVoFVQUm
 const DEMO = /[?&]demo\b/.test(location.search);   // Testmodus: Daten nur im Browser, nie in der echten Tabelle
 const POLL_MS = 10000;
 // ===== App-Version: bei JEDEM Umbau APP_BUILD erhöhen und CHANGES ergänzen =====
-const APP_VERSION = '2.8', APP_BUILD = 208, APP_DATE = '09.11.2026';
+const APP_VERSION = '2.9', APP_BUILD = 209, APP_DATE = '09.11.2026';
 const CHANGES = [
+  ['2.9','09.11.2026','Beim Start „Verbinde …“ mit schnellen Wiederholversuchen; offline alle 4 s neuer Versuch; letzte Störung wird angezeigt.'],
   ['2.8','09.11.2026','Verbindung robuster: Zeitlimit, Speichern wird bei Serverfehlern wiederholt statt verworfen. Tippen auf „Offline“ zeigt den Grund und „Jetzt neu verbinden“.'],
   ['2.7','08.11.2026','Umzug auf GitHub Pages: keine Credits-Grenze, kein Netlify-Hinweis mehr.'],
   ['2.6','08.11.2026','Gleichzeitiges Arbeiten: Änderungen werden zusammengeführt statt verworfen. Versionsanzeige und Update-Hinweis.'],
@@ -332,6 +333,7 @@ async function applyPhoto(a, target){
 /* ================= Server / Speichern ================= */
 let demoDb = null;
 function demoCall(fn, args){
+  if(/failstart/.test(location.search) && !demoCall.failed){ demoCall.failed=1; return Promise.reject(new Error('Test: erster Verbindungsversuch fehlgeschlagen')); } // nur Testmodus
   if(!demoDb){ try{ demoDb=JSON.parse(localStorage.getItem('demoDb')||'null'); }catch(e){} demoDb=demoDb||{state:null,img:{}}; }
   const save=()=>{ try{ localStorage.setItem('demoDb',JSON.stringify(demoDb)); }catch(e){} };
   return new Promise(r=>setTimeout(()=>{
@@ -432,8 +434,11 @@ function mergeState(b, l, r){
 function adopt(x){ S=normalize(x); setBase(S); saveLocal(); }
 function saveLocal(){ try{ localStorage.setItem(LKEY, JSON.stringify(S)); }catch(e){} }
 function persist(){ saveLocal(); dirty=true; flush(); }
-let lastErr='', lastSync=0;
+let lastErr='', lastSync=0, connecting=true;
 const errMsg = e => (e && e.message) ? e.message : String(e);
+// Letzte Störung dauerhaft merken (auch nach erfolgreichem Wiederverbinden sichtbar)
+function noteErr(m){ lastErr=m; try{ localStorage.setItem('cockpit3d-stoerung', JSON.stringify({t:Date.now(), m})); }catch(e){} }
+function lastIncident(){ try{ return JSON.parse(localStorage.getItem('cockpit3d-stoerung')||'null'); }catch(e){ return null; } }
 // Eigenen Stand auf dem Gerät sichern (falls etwas nicht zusammengeführt/gespeichert werden konnte)
 function stashLocal(why){ try{ localStorage.setItem('cockpit3d-gesichert-'+new Date().toISOString().slice(0,16), JSON.stringify({why, state:S})); }catch(e){} }
 async function flush(){
@@ -445,7 +450,7 @@ async function flush(){
     const sent=JSON.stringify(S);
     let r;
     try{ r = await call('saveState', sent, S.rev||0); }
-    catch(e){ lastErr='Speichern: '+errMsg(e); dirty=true; live=false; setStatus(); toast('Keine Verbindung – Änderung wird gespeichert, sobald wieder Verbindung besteht.', true); return; }
+    catch(e){ noteErr('Speichern: '+errMsg(e)); dirty=true; live=false; setStatus(); toast('Keine Verbindung – Änderung wird gespeichert, sobald wieder Verbindung besteht.', true); return; }
     if(r && r.ok){ S.rev=r.rev; const s=JSON.parse(sent); s.rev=r.rev; setBase(s); saveLocal(); lastSync=Date.now(); lastErr=''; }
     else if(r && r.conflict){
       const remote=normalize(JSON.parse(r.state));
@@ -462,6 +467,7 @@ function openSync(){
   openModal(`<div class="mh"><h3>${live?'✅ Verbunden':'⚠️ Offline'}</h3><button class="x" data-act="modal-close">✕</button></div>
     <div class="muted" style="font-size:14px">Zuletzt erfolgreich gespeichert: <b>${t}</b><br>Ungespeicherte Änderungen auf diesem Gerät: <b>${dirty?'ja':'nein'}</b><br>App-Version: <b>${APP_VERSION}</b></div>
     ${lastErr?`<div class="card" style="background:var(--badbg);box-shadow:none;margin-top:10px;font-size:13px"><b>Letzter Fehler:</b><br>${esc(lastErr)}</div>`:''}
+    ${(()=>{ const i=lastIncident(); return i?`<div class="muted" style="margin-top:8px;font-size:12.5px">Letzte Störung: ${new Date(i.t).toLocaleString('de-DE')} – ${esc(i.m)}</div>`:''; })()}
     <button class="btn big" data-act="sync-now">🔄 Jetzt neu verbinden</button>
     <button class="btn sec big" data-act="sync-reload">⬇️ Stand vom Server laden</button>
     <div class="muted" style="margin-top:8px">„Stand vom Server laden“ sichert vorher alles Ungespeicherte auf diesem Gerät.</div>`);
@@ -473,6 +479,7 @@ function toast(msg, bad){
 function setStatus(){
   $('#dot').className='dot'+(live?' on':'');
   const day=new Date().toLocaleDateString('de-DE',{weekday:'long',day:'numeric',month:'long'});
+  if(connecting && !live){ $('#dot').className='dot'; $('#status').textContent=(DEMO?'TESTMODUS · ':'')+'Verbinde …'; return; }
   $('#status').textContent=(DEMO?'TESTMODUS · ':'')+(live?day:'Offline – nur auf diesem Gerät · tippen für Details');
 }
 
@@ -1092,8 +1099,8 @@ async function poll(){
   try{
     let txt;
     try{ txt=await call('getState'); }
-    catch(e){ lastErr='Laden: '+errMsg(e); if(live){ live=false; setStatus(); } return; }
-    if(!live){ live=true; setStatus(); }
+    catch(e){ noteErr('Laden: '+errMsg(e)); if(live){ live=false; setStatus(); } return; }
+    if(!live||connecting){ live=true; connecting=false; setStatus(); }
     if(dirty){ flush(); return; }
     if(!txt) return;
     const x=JSON.parse(txt);
@@ -1109,13 +1116,14 @@ async function init(){
   const unsaved = !!(local && local.orders && lbase && !same(local,lbase)); // Änderungen, die z. B. offline nicht mehr gespeichert wurden
   S=normalize((local&&local.orders)?local:defaults());
   if(lbase) BASE=lbase;
+  if(unsaved){ dirty=true; stashLocal('Beim Start ungespeichert gefunden'); } // nie durch Server-Stand überschreiben, sondern zusammenführen
   render();
   try{
     const txt=await call('getState');
     live=true;
     if(txt){
       const remote=normalize(JSON.parse(txt));
-      if(unsaved){
+      if(unsaved || dirty){
         try{ S=mergeState(BASE, S, remote); setBase(remote); saveLocal(); dirty=true; flush(); }
         catch(e){ stashLocal('Start-Zusammenführen: '+errMsg(e)); adopt(remote); lastErr='Zusammenführen: '+errMsg(e); }
       }
@@ -1129,11 +1137,16 @@ async function init(){
       if(r&&r.ok) S.rev=r.rev; else if(r&&r.conflict) adopt(JSON.parse(r.state));
       saveLocal();
     }
-  }catch(e){ live=false; lastErr='Start: '+errMsg(e); toast('Gemeinsame Tabelle nicht erreichbar – tippe oben auf „Offline“ für Details.', true); }
+  }catch(e){ live=false; noteErr('Start: '+errMsg(e)); }
   render();
   $('#status').parentElement.style.cursor='pointer';
   $('#status').parentElement.addEventListener('click', openSync);
-  setInterval(()=>{ if(!document.hidden) poll(); }, POLL_MS);
+  // Start fehlgeschlagen? Schnell erneut versuchen (nach 2, 5, 10 s), erst danach „Offline“ zeigen
+  if(!live){ for(const wait of [2000,3000,5000]){ await new Promise(r=>setTimeout(r,wait)); await poll(); if(live) break; } }
+  connecting=false; setStatus();
+  if(!live) toast('Keine Verbindung zur gemeinsamen Tabelle – oben auf „Offline“ tippen für Details.', true);
+  // Abgleich: alle 10 s, solange offline alle 4 s
+  (function tick(){ setTimeout(async()=>{ try{ if(!document.hidden) await poll(); }finally{ tick(); } }, live?POLL_MS:4000); })();
   document.addEventListener('visibilitychange', ()=>{ if(!document.hidden) poll(); });
 }
 init();
