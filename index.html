@@ -163,8 +163,9 @@ const API_URL = 'https://script.google.com/macros/s/AKfycbzCOCM_-jRAiI1YzVoFVQUm
 const DEMO = /[?&]demo\b/.test(location.search);   // Testmodus: Daten nur im Browser, nie in der echten Tabelle
 const POLL_MS = 10000;
 // ===== App-Version: bei JEDEM Umbau APP_BUILD erhöhen und CHANGES ergänzen =====
-const APP_VERSION = '2.7', APP_BUILD = 207, APP_DATE = '08.11.2026';
+const APP_VERSION = '2.8', APP_BUILD = 208, APP_DATE = '09.11.2026';
 const CHANGES = [
+  ['2.8','09.11.2026','Verbindung robuster: Zeitlimit, Speichern wird bei Serverfehlern wiederholt statt verworfen. Tippen auf „Offline“ zeigt den Grund und „Jetzt neu verbinden“.'],
   ['2.7','08.11.2026','Umzug auf GitHub Pages: keine Credits-Grenze, kein Netlify-Hinweis mehr.'],
   ['2.6','08.11.2026','Gleichzeitiges Arbeiten: Änderungen werden zusammengeführt statt verworfen. Versionsanzeige und Update-Hinweis.'],
   ['2.5','08.11.2026','Lager-Verlauf; Bestand zeigt frei / reserviert / unterwegs.'],
@@ -344,13 +345,24 @@ function demoCall(fn, args){
     }
   },120));
 }
+// Anfrage mit Zeitlimit; verständliche Fehlermeldung, wenn Google keine gültige Antwort liefert
+async function fetchJson(url, opt){
+  const ac = window.AbortController ? new AbortController() : null;
+  const to = setTimeout(()=>ac && ac.abort(), 25000);
+  let r;
+  try{ r = await fetch(url, {...opt, credentials:'omit', cache:'no-store', signal: ac?ac.signal:undefined}); }
+  catch(e){ throw new Error(e && e.name==='AbortError' ? 'Zeitüberschreitung (keine Antwort nach 25 s)' : 'Keine Internetverbindung zu Google ('+(e&&e.message||e)+')'); }
+  finally{ clearTimeout(to); }
+  const txt = await r.text();
+  try{ return JSON.parse(txt); }
+  catch(e){ throw new Error('Google antwortet nicht richtig (HTTP '+r.status+'): '+txt.replace(/<[^>]+>/g,' ').replace(/\s+/g,' ').trim().slice(0,120)); }
+}
 async function apiGet(params){
-  const r = await fetch(API_URL+'?'+new URLSearchParams(params), {credentials:'omit', cache:'no-store'});
-  const j = await r.json(); if(!j.ok) throw new Error(j.error||'Serverfehler'); return j;
+  const j = await fetchJson(API_URL+'?'+new URLSearchParams(params), {});
+  if(!j.ok) throw new Error(j.error||'Serverfehler'); return j;
 }
 async function apiPost(body){
-  const r = await fetch(API_URL, {method:'POST', credentials:'omit', headers:{'Content-Type':'text/plain;charset=utf-8'}, body:JSON.stringify(body)});
-  return r.json();
+  return fetchJson(API_URL, {method:'POST', headers:{'Content-Type':'text/plain;charset=utf-8'}, body:JSON.stringify(body)});
 }
 function call(fn, ...args){
   if(DEMO) return demoCall(fn, args);
@@ -420,25 +432,39 @@ function mergeState(b, l, r){
 function adopt(x){ S=normalize(x); setBase(S); saveLocal(); }
 function saveLocal(){ try{ localStorage.setItem(LKEY, JSON.stringify(S)); }catch(e){} }
 function persist(){ saveLocal(); dirty=true; flush(); }
+let lastErr='', lastSync=0;
+const errMsg = e => (e && e.message) ? e.message : String(e);
+// Eigenen Stand auf dem Gerät sichern (falls etwas nicht zusammengeführt/gespeichert werden konnte)
+function stashLocal(why){ try{ localStorage.setItem('cockpit3d-gesichert-'+new Date().toISOString().slice(0,16), JSON.stringify({why, state:S})); }catch(e){} }
 async function flush(){
   if(!live || saving || !dirty) return;
   saving=true; dirty=false;
+  let again=false;
   try{
     if((S.appBuild||0)<APP_BUILD) S.appBuild=APP_BUILD;   // zeigt älteren Geräten: es gibt eine neuere Version
     const sent=JSON.stringify(S);
-    const r = await call('saveState', sent, S.rev||0);
-    if(r && r.ok){ S.rev=r.rev; const s=JSON.parse(sent); s.rev=r.rev; setBase(s); saveLocal(); }
+    let r;
+    try{ r = await call('saveState', sent, S.rev||0); }
+    catch(e){ lastErr='Speichern: '+errMsg(e); dirty=true; live=false; setStatus(); toast('Keine Verbindung – Änderung wird gespeichert, sobald wieder Verbindung besteht.', true); return; }
+    if(r && r.ok){ S.rev=r.rev; const s=JSON.parse(sent); s.rev=r.rev; setBase(s); saveLocal(); lastSync=Date.now(); lastErr=''; }
     else if(r && r.conflict){
       const remote=normalize(JSON.parse(r.state));
-      S=mergeState(BASE, S, remote); setBase(remote); saveLocal();
-      dirty=true;                                   // zusammengeführten Stand gleich speichern
+      try{ S=mergeState(BASE, S, remote); setBase(remote); saveLocal(); dirty=true; again=true; }
+      catch(e){ stashLocal('Zusammenführen: '+errMsg(e)); adopt(remote); lastErr='Zusammenführen: '+errMsg(e); toast('Eine Änderung konnte nicht zusammengeführt werden – sie ist auf diesem Gerät gesichert.', true); }
       if(!busy()) render();
     }
-    else toast('Speichern fehlgeschlagen: '+((r&&r.error)||'unbekannt'), true);
-  }catch(e){
-    dirty=true; live=false; setStatus(); toast('Keine Verbindung. Änderung nur auf diesem Gerät gespeichert.', true);
+    else { dirty=true; lastErr='Server: '+((r&&r.error)||'unbekannt'); toast('Server hat kurz nicht gespeichert – neuer Versuch folgt automatisch.', true); }  // nicht verwerfen, beim nächsten Abgleich erneut
   }finally{ saving=false; }
-  if(dirty) flush();
+  if(again) flush();
+}
+function openSync(){
+  const t=lastSync?new Date(lastSync).toLocaleString('de-DE'):'–';
+  openModal(`<div class="mh"><h3>${live?'✅ Verbunden':'⚠️ Offline'}</h3><button class="x" data-act="modal-close">✕</button></div>
+    <div class="muted" style="font-size:14px">Zuletzt erfolgreich gespeichert: <b>${t}</b><br>Ungespeicherte Änderungen auf diesem Gerät: <b>${dirty?'ja':'nein'}</b><br>App-Version: <b>${APP_VERSION}</b></div>
+    ${lastErr?`<div class="card" style="background:var(--badbg);box-shadow:none;margin-top:10px;font-size:13px"><b>Letzter Fehler:</b><br>${esc(lastErr)}</div>`:''}
+    <button class="btn big" data-act="sync-now">🔄 Jetzt neu verbinden</button>
+    <button class="btn sec big" data-act="sync-reload">⬇️ Stand vom Server laden</button>
+    <div class="muted" style="margin-top:8px">„Stand vom Server laden“ sichert vorher alles Ungespeicherte auf diesem Gerät.</div>`);
 }
 function toast(msg, bad){
   const t=$('#toast'); t.textContent=msg; t.className='toast'+(bad?' bad':''); t.style.display='block';
@@ -447,7 +473,7 @@ function toast(msg, bad){
 function setStatus(){
   $('#dot').className='dot'+(live?' on':'');
   const day=new Date().toLocaleDateString('de-DE',{weekday:'long',day:'numeric',month:'long'});
-  $('#status').textContent=(DEMO?'TESTMODUS · ':'')+(live?day:'Offline – Änderungen nur auf diesem Gerät');
+  $('#status').textContent=(DEMO?'TESTMODUS · ':'')+(live?day:'Offline – nur auf diesem Gerät · tippen für Details');
 }
 
 /* ================= Lager ================= */
@@ -991,6 +1017,8 @@ function act(name, el){
     case 'art-new-save': saveArtNew(el); break;
     case 'calc-new': calcNew(el).catch(e=>calcMsg('Fehler: '+e.message, true)); break;
     case 'app-update': (async()=>{ try{ const rs=await navigator.serviceWorker?.getRegistrations?.(); for(const r of (rs||[])) await r.update(); const ks=await caches?.keys?.(); for(const k of (ks||[])) await caches.delete(k); }catch(e){} location.reload(); })(); break;
+    case 'sync-now': closeModal(); lastErr=''; poll().then(()=>{ toast(live?'Verbunden ✓':'Noch keine Verbindung – Details oben antippen', !live); render(); }); break;
+    case 'sync-reload': (async()=>{ try{ const txt=await call('getState'); stashLocal('Server-Stand geladen'); live=true; dirty=false; adopt(JSON.parse(txt)); closeModal(); render(); toast('Aktueller Stand geladen ✓'); }catch(e){ lastErr='Laden: '+errMsg(e); closeModal(); openSync(); } })(); break;
     case 'backup-json': backup('json'); toast('Sicherung wird heruntergeladen'); break;
     case 'backup-csv-o': backup('o'); toast('Tabelle wird heruntergeladen'); break;
     case 'backup-csv-a': backup('a'); toast('Tabelle wird heruntergeladen'); break;
@@ -1062,7 +1090,9 @@ function busy(){
 async function poll(){
   if(saving) return;
   try{
-    const txt=await call('getState');
+    let txt;
+    try{ txt=await call('getState'); }
+    catch(e){ lastErr='Laden: '+errMsg(e); if(live){ live=false; setStatus(); } return; }
     if(!live){ live=true; setStatus(); }
     if(dirty){ flush(); return; }
     if(!txt) return;
@@ -1070,7 +1100,7 @@ async function poll(){
     if(!x||!x.orders||(x.rev||0)<=(S.rev||0)) return;
     if(busy()) return;
     adopt(x); render();
-  }catch(e){ if(live){ live=false; setStatus(); } }
+  }catch(e){ lastErr='Anzeige: '+errMsg(e); }   // Fehler in der Anzeige ≠ keine Verbindung
 }
 async function init(){
   document.body.classList.toggle('nl', /netlify\.app$/.test(location.hostname)); // Platz für den Netlify-Hinweis unten
@@ -1085,7 +1115,10 @@ async function init(){
     live=true;
     if(txt){
       const remote=normalize(JSON.parse(txt));
-      if(unsaved){ S=mergeState(BASE, S, remote); setBase(remote); saveLocal(); dirty=true; flush(); }
+      if(unsaved){
+        try{ S=mergeState(BASE, S, remote); setBase(remote); saveLocal(); dirty=true; flush(); }
+        catch(e){ stashLocal('Start-Zusammenführen: '+errMsg(e)); adopt(remote); lastErr='Zusammenführen: '+errMsg(e); }
+      }
       else adopt(remote);
       if((S.appBuild||0)<APP_BUILD){ dirty=true; flush(); }   // neuere Version einmalig bekannt machen
     }
@@ -1096,9 +1129,11 @@ async function init(){
       if(r&&r.ok) S.rev=r.rev; else if(r&&r.conflict) adopt(JSON.parse(r.state));
       saveLocal();
     }
-  }catch(e){ live=false; toast('Gemeinsame Tabelle nicht erreichbar. Anzeige aus lokaler Kopie.', true); }
+  }catch(e){ live=false; lastErr='Start: '+errMsg(e); toast('Gemeinsame Tabelle nicht erreichbar – tippe oben auf „Offline“ für Details.', true); }
   render();
-  setInterval(poll, POLL_MS);
+  $('#status').parentElement.style.cursor='pointer';
+  $('#status').parentElement.addEventListener('click', openSync);
+  setInterval(()=>{ if(!document.hidden) poll(); }, POLL_MS);
   document.addEventListener('visibilitychange', ()=>{ if(!document.hidden) poll(); });
 }
 init();

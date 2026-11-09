@@ -1,5 +1,5 @@
 // Offline-Hülle der App. Daten (script.google.com) werden nie zwischengespeichert.
-const CACHE = 'cockpit-v10';
+const CACHE = 'cockpit-v11';
 const SHELL = ['./', './index.html', './manifest.webmanifest', './icon-192-v2.png', './icon-512-v2.png', './apple-touch-icon-v2.png'];
 
 self.addEventListener('install', e => {
