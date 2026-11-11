@@ -163,8 +163,9 @@ const API_URL = 'https://script.google.com/macros/s/AKfycbzCOCM_-jRAiI1YzVoFVQUm
 const DEMO = /[?&]demo\b/.test(location.search);   // Testmodus: Daten nur im Browser, nie in der echten Tabelle
 const POLL_MS = 10000;
 // ===== App-Version: bei JEDEM Umbau APP_BUILD erhöhen und CHANGES ergänzen =====
-const APP_VERSION = '2.9', APP_BUILD = 209, APP_DATE = '09.11.2026';
+const APP_VERSION = '2.10', APP_BUILD = 210, APP_DATE = '11.11.2026';
 const CHANGES = [
+  ['2.10','11.11.2026','Nachkalkulieren: Artikel öffnen → „🧮 Nachkalkulieren“. Neu: 💝 Preisnachlass je Bestellung (%, €, Geschenk, Anlass).'],
   ['2.9','09.11.2026','Beim Start „Verbinde …“ mit schnellen Wiederholversuchen; offline alle 4 s neuer Versuch; letzte Störung wird angezeigt.'],
   ['2.8','09.11.2026','Verbindung robuster: Zeitlimit, Speichern wird bei Serverfehlern wiederholt statt verworfen. Tippen auf „Offline“ zeigt den Grund und „Jetzt neu verbinden“.'],
   ['2.7','08.11.2026','Umzug auf GitHub Pages: keine Credits-Grenze, kein Netlify-Hinweis mehr.'],
@@ -223,6 +224,9 @@ function normalize(x){
 let S=null, live=false, tab='start', saving=false, dirty=false;
 let selBuyer=null, paySel={}, delArmed=false, artFilter='aktiv', lagerFilter='alle';
 let lagerMode='bestand', kommFilter='offen', mNr=null, mQty=1;
+let calcEdit=null;   // Artikelnummer, die gerade nachkalkuliert wird (null = neuer Artikel)
+const CALC_FIELDS=['r_roll','r_inh','r_fil','r_son','r_std','r_min','r_zn','r_zp','r_nach'];
+function readCalcInputs(){ const o={}; CALC_FIELDS.forEach(id=>{ const v=num($('#'+id).value); if(v!=null&&!Number.isNaN(v)) o[id]=v; }); return o; }
 let newNr=null, newQty=1, editNr=null, pendingImg={}; // pendingImg[ziel] = data-URL | '' (entfernen)
 const $ = s => document.querySelector(s);
 const esc = s => String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -240,11 +244,22 @@ const buyers = () => [...new Set(S.orders.map(o=>o.buyer))].sort(byName);
 const hasGas = () => !!(window.google && google.script && google.script.run);
 const nextNr = () => Math.max(0,...S.articles.map(a=>a.nr))+1;
 
+// Preisnachlass einer Bestellung: {p: Prozent, a: € auf die ganze Bestellung, gift: Geschenk, why: Anlass}
+function discUnit(base, qty, disc){
+  if(base==null || !disc) return base;
+  if(disc.gift) return 0;
+  let u=base;
+  if(disc.p) u=u*(1-disc.p/100);
+  if(disc.a) u=u-disc.a/Math.max(1,qty);
+  return Math.max(0, Math.round(u*100)/100);
+}
+function discLabel(d){ if(!d) return ''; return d.gift?'🎁 Geschenk':[d.p?'−'+dec(d.p)+' %':'', d.a?'−'+EUR(d.a):''].filter(Boolean).join(' '); }
 function info(o){
   const a = art(o.nr);
-  const u = o.manual!=null ? o.manual : (a ? usedPrice(a) : null);
+  const base = o.manual!=null ? o.manual : (a ? usedPrice(a) : null);
+  const u = discUnit(base, o.qty, o.disc);
   const ok = u!=null && !Number.isNaN(u);
-  return { a, u, ok,
+  return { a, u, base, isDisc: ok && base!=null && u!==base, ok,
     toPrint: Math.max(0,o.qty-o.printed),
     billable: Math.max(0,Math.min(o.printed,o.qty)-o.paid),
     open: ok ? Math.max(0,o.qty-o.paid)*u : 0,
@@ -537,7 +552,7 @@ function vStart(){
       <div class="row"><b style="font-size:17px">${esc(name)}</b><span class="pill ${sum>0?'warn':''}">${EUR(sum)}</span></div>
       ${rs.map(({o,i})=>`<div class="ord">
         <div class="row" data-edit="${o.id}" style="cursor:pointer">${thumb(i.a,'sm')}<div style="flex:1;min-width:0"><b>${esc(itemName(o))}</b> · ${o.qty} Stk.
-          <div class="muted">${fmtDate(o.date)}${i.toPrint>0&&daysSince(o.date)>4?' · <span class="err">über 4 Tage</span>':''} · ${i.ok?EUR(i.u)+'/Stk.':'<span class="err">kein Preis</span>'}${o.inStock?` · 📦 ${o.inStock} bereit im Lager`:''}</div></div><span class="muted">✎</span></div>
+          <div class="muted">${fmtDate(o.date)}${i.toPrint>0&&daysSince(o.date)>4?' · <span class="err">über 4 Tage</span>':''} · ${i.ok?(i.isDisc?`<s>${EUR(i.base)}</s> <b style="color:var(--accent)">${EUR(i.u)}</b>/Stk. · 💝 ${esc(o.disc.why||discLabel(o.disc))}`:EUR(i.u)+'/Stk.'):'<span class="err">kein Preis</span>'}${o.inStock?` · 📦 ${o.inStock} bereit im Lager`:''}</div></div><span class="muted">✎</span></div>
         <div class="ctl"><span class="lbl">Gedruckt</span><span></span>${stepper('pr',o.id,o.printed,o.qty)}</div>
         <div class="ctl"><span class="lbl">Bezahlt</span><span></span>${stepper('pd',o.id,o.paid,o.qty)}</div>
       </div>`).join('')}
@@ -564,16 +579,40 @@ function vNeu(){
     </div>
     <label>Variante (optional)</label><input id="f_var" value="${esc(a?a.variant:'')}">
     <label>Manueller Stückpreis (optional)</label><input id="f_manual" inputmode="decimal" placeholder="leer = Artikelpreis">
+    ${discFields('f',null)}
     <label>Notiz (optional)</label><input id="f_note">
     <div id="f_out" class="muted" style="margin-top:10px"></div>
     <button class="btn big" data-act="save-new">Bestellung speichern</button></div>`;
+}
+// Bereich „Preisnachlass“ für Neu (pre='f') und Bearbeiten (pre='e')
+function discFields(pre, d){
+  d=d||{};
+  const open=!!(d.p||d.a||d.gift);
+  return `<details style="margin-top:12px" ${open?'open':''}><summary class="sumh" style="padding:8px 0">💝 Preisnachlass ${open?'· '+esc(discLabel(d)):'(optional)'}</summary>
+    <div class="chips" style="flex-wrap:wrap">${[['10','−10 %'],['20','−20 %'],['50','−50 %'],['gift','🎁 Geschenk'],['clear','Kein Nachlass']].map(([v,l])=>`<button class="chip" data-act="disc" data-pre="${pre}" data-v="${v}">${l}</button>`).join('')}</div>
+    <div class="inp-row"><div><label>Rabatt in %</label><input id="${pre}_dp" inputmode="decimal" value="${d.p?dec(d.p):''}"></div><div><label>oder € Nachlass (ganze Bestellung)</label><input id="${pre}_da" inputmode="decimal" value="${d.a?dec(d.a):''}"></div></div>
+    <label style="display:flex;align-items:center;gap:10px"><input type="checkbox" id="${pre}_dg" ${d.gift?'checked':''} style="width:22px;height:22px">🎁 Geschenk (kostenlos)</label>
+    <label>Anlass (optional)</label><input id="${pre}_dw" value="${esc(d.why||'')}" placeholder="z. B. Freundschaftspreis, Geburtstag">
+  </details>`;
+}
+// Nachlass aus den Feldern lesen: null = kein Nachlass, {err} = ungültig
+function readDisc(pre){
+  const p=num($('#'+pre+'_dp').value), a=num($('#'+pre+'_da').value), gift=$('#'+pre+'_dg').checked, why=$('#'+pre+'_dw').value.trim();
+  if(p!=null && (Number.isNaN(p)||p<0||p>100)) return {err:'Rabatt: 0 bis 100 %'};
+  if(a!=null && (Number.isNaN(a)||a<0)) return {err:'Nachlass in € ungültig'};
+  if(!gift && !p && !a) return null;
+  return {p:p||null, a:a||null, gift:!!gift, why};
 }
 function updNeu(){
   const out=$('#f_out'); if(!out) return;
   const a=newNr!=null?art(newNr):null, m=num($('#f_manual').value);
   if(!a){ out.innerHTML=''; return; }
-  const u=(m!=null&&!Number.isNaN(m))?m:usedPrice(a);
-  let h=u==null?'<span class="err">Kein Preis – bitte manuell eingeben</span>':`Stückpreis <b>${EUR(u)}</b> · Summe <b>${EUR(u*newQty)}</b>`;
+  const base=(m!=null&&!Number.isNaN(m))?m:usedPrice(a);
+  const d=readDisc('f'), u=(d&&!d.err)?discUnit(base,newQty,d):base;
+  let h=u==null?'<span class="err">Kein Preis – bitte manuell eingeben</span>'
+    :(u!==base?`Stückpreis <s>${EUR(base)}</s> <b style="color:var(--accent)">${EUR(u)}</b> · Summe <b>${EUR(u*newQty)}</b> <span class="pill">💝 ${esc(d.why||discLabel(d))}</span>`
+    :`Stückpreis <b>${EUR(u)}</b> · Summe <b>${EUR(u*newQty)}</b>`);
+  if(d&&d.err) h+=`<div class="err">${d.err}</div>`;
   const take=Math.min(freeStock(a),newQty);
   if(take>0) h+=`<div class="pill ok" style="margin-top:8px">📦 ${take} Stk. werden aus dem Lager genommen</div>`;
   const rw=richtwert(a);
@@ -690,7 +729,7 @@ function selectedItems(buyer){
   return S.orders.filter(o=>o.buyer===buyer).map(o=>({o,i:info(o)})).filter(x=>x.i.ok&&x.i.billable>0).filter(x=>paySel[x.o.id]!==false);
 }
 function statement(buyer, items){
-  const lines=items.map(({o,i})=>`${fmtDate(o.date)} | ${itemName(o)} | ${i.billable} Stk. | ${EUR(i.u)} | ${EUR(i.billable*i.u)}`);
+  const lines=items.map(({o,i})=>`${fmtDate(o.date)} | ${itemName(o)} | ${i.billable} Stk. | ${EUR(i.u)}${i.isDisc?` (statt ${EUR(i.base)}, 💝 ${o.disc.why||discLabel(o.disc)})`:''} | ${EUR(i.billable*i.u)}`);
   const tot=items.reduce((s,{i})=>s+i.billable*i.u,0);
   return `Zahlungsübersicht – ${buyer} (Stand ${fmtDate(today())})\n${lines.join('\n')}\nGesamt: ${EUR(tot)}`;
 }
@@ -705,7 +744,7 @@ function vZahlen(){
     <button class="picker-btn" data-act="pick-buyer"><div class="th">${esc(selBuyer.charAt(0).toUpperCase())}</div><span class="t"><b>${esc(selBuyer)}</b><small>${withOpen.length} Personen mit offenen Beträgen · antippen zum Wechseln</small></span><span class="muted">🔍</span></button>
     <div class="muted" style="margin:10px 0 4px">Nur gedruckte, noch unbezahlte Stücke. Haken entfernen, wenn etwas nicht berechnet werden soll.</div>
     ${items.map(({o,i})=>`<div class="check"><input type="checkbox" data-pay="${o.id}" ${paySel[o.id]!==false?'checked':''}>${thumb(i.a,'sm')}
-      <div style="flex:1;min-width:0"><div>${esc(itemName(o))}</div><div class="muted">${fmtDate(o.date)} · ${i.billable} Stk. à ${EUR(i.u)}</div></div><b>${EUR(i.billable*i.u)}</b></div>`).join('')}
+      <div style="flex:1;min-width:0"><div>${esc(itemName(o))}</div><div class="muted">${fmtDate(o.date)} · ${i.billable} Stk. à ${EUR(i.u)}${i.isDisc?' · 💝':''}</div></div><b>${EUR(i.billable*i.u)}</b></div>`).join('')}
     <div class="row" style="margin-top:12px"><b>Gesamt</b><span class="big-num">${EUR(total)}</span></div>
     <button class="btn big" data-act="copy-pay">Übersicht für WhatsApp kopieren</button>
     <button class="btn sec big" data-act="mark-paid">Ausgewählte als bezahlt markieren</button></div>`;
@@ -718,18 +757,24 @@ function vMehr(){
   const bo=Object.entries(byB).sort((a,b)=>byName(a[0],b[0]));
   const ar=S.articles.map(a=>{ const os=rows.filter(r=>r.o.nr===a.nr); return {a,q:os.reduce((s,r)=>s+r.o.qty,0),pr:os.reduce((s,r)=>s+r.o.printed,0),pd:os.reduce((s,r)=>s+r.o.paid,0),open:os.reduce((s,r)=>s+r.i.open,0)}; }).filter(x=>x.q>0).sort((a,b)=>byName(a.a.name,b.a.name));
   const s=S.settings;
-  return `<details open><summary class="sumh">Kalkulator: Artikel berechnen</summary>
+  const ea=calcEdit!=null?art(calcEdit):null, cv=(ea&&ea.calcIn)||{}, fv=id=>cv[id]!=null?dec(cv[id]):'';
+  return `<details open id="calc_box"><summary class="sumh">${ea?'Nachkalkulation: '+esc(ea.nr+'. '+ea.name):'Kalkulator: Artikel berechnen'}</summary>
   <div class="card" id="calc">
-    <label style="margin-top:0">Artikelname</label><input id="c_name" placeholder="z. B. Monitor Ghost">
+    ${ea?`<div class="row" style="justify-content:flex-start;gap:12px;margin-bottom:6px">${thumb(ea)}<div><b>${esc(ea.name)}</b><div class="muted">Bisher: kalkuliert ${ea.calc==null?'–':EUR(ea.calc)}${ea.manual!=null?` · Verkaufspreis manuell ${EUR(ea.manual)}`:''}</div></div></div>
+      ${ea.calcIn?'':'<div class="warn" style="margin-bottom:6px">Für diesen Artikel sind noch keine Kalkulationswerte gespeichert – bitte einmal eintragen. Ab dann sind sie beim nächsten Mal vorbelegt.</div>'}`
+    :`<label style="margin-top:0">Artikelname</label><input id="c_name" placeholder="z. B. Monitor Ghost">
     ${photoField('calc',null)}
-    <div class="inp-row"><div><label>Variante</label><input id="c_var"></div><div><label>Notiz</label><input id="c_note"></div></div>
-    <div class="inp-row"><div><label>Rollenpreis (€)</label><input id="r_roll" inputmode="decimal"></div><div><label>Rolleninhalt (g)</label><input id="r_inh" inputmode="numeric" placeholder="${s.rolle}"></div></div>
-    <div class="inp-row"><div><label>Filament (g)</label><input id="r_fil" inputmode="decimal"></div><div><label>Sonstige Kosten (€)</label><input id="r_son" inputmode="decimal"></div></div>
-    <div class="inp-row"><div><label>Druckzeit Std.</label><input id="r_std" inputmode="decimal"></div><div><label>Druckzeit Min.</label><input id="r_min" inputmode="decimal"></div></div>
-    <div class="inp-row"><div><label>Zusatzteile (Anzahl)</label><input id="r_zn" inputmode="numeric"></div><div><label>Preis je Zusatzteil (€)</label><input id="r_zp" inputmode="decimal"></div></div>
-    <div class="inp-row"><div><label>Nacharbeit (Min.)</label><input id="r_nach" inputmode="numeric"></div><div><label>Schon im Lager (Stk.)</label><input id="c_stock" inputmode="numeric" placeholder="0"></div></div>
+    <div class="inp-row"><div><label>Variante</label><input id="c_var"></div><div><label>Notiz</label><input id="c_note"></div></div>`}
+    <div class="inp-row"><div><label>Rollenpreis (€)</label><input id="r_roll" inputmode="decimal" value="${fv('r_roll')}"></div><div><label>Rolleninhalt (g)</label><input id="r_inh" inputmode="numeric" placeholder="${s.rolle}" value="${fv('r_inh')}"></div></div>
+    <div class="inp-row"><div><label>Filament (g)</label><input id="r_fil" inputmode="decimal" value="${fv('r_fil')}"></div><div><label>Sonstige Kosten (€)</label><input id="r_son" inputmode="decimal" value="${fv('r_son')}"></div></div>
+    <div class="inp-row"><div><label>Druckzeit Std.</label><input id="r_std" inputmode="decimal" value="${fv('r_std')}"></div><div><label>Druckzeit Min.</label><input id="r_min" inputmode="decimal" value="${fv('r_min')}"></div></div>
+    <div class="inp-row"><div><label>Zusatzteile (Anzahl)</label><input id="r_zn" inputmode="numeric" value="${fv('r_zn')}"></div><div><label>Preis je Zusatzteil (€)</label><input id="r_zp" inputmode="decimal" value="${fv('r_zp')}"></div></div>
+    <div class="inp-row"><div><label>Nacharbeit (Min.)</label><input id="r_nach" inputmode="numeric" value="${fv('r_nach')}"></div>${ea?'<div></div>':'<div><label>Schon im Lager (Stk.)</label><input id="c_stock" inputmode="numeric" placeholder="0"></div>'}</div>
     <div id="r_out" style="margin-top:12px"></div>
-    <button class="btn big" id="calc_btn" data-act="calc-new">Als neuen Artikel anlegen</button>
+    ${ea?`<button class="btn big" data-act="calc-apply">Neuen Preis für „${esc(ea.name)}“ übernehmen</button>
+      <button class="btn sec big" data-act="calc-cancel">Abbrechen</button>
+      ${ea.manual!=null?'<div class="muted" style="margin-top:6px">Der Verkaufspreis ist manuell festgelegt und bleibt so. Den neuen kalkulierten Preis nutzt du, indem du beim Artikel auf „Automatik“ stellst (manuellen Preis leeren).</div>':''}`
+    :`<button class="btn big" id="calc_btn" data-act="calc-new">Als neuen Artikel anlegen</button>`}
     <div id="calc_msg" style="margin-top:8px;font-size:14px;font-weight:600"></div>
   </div></details>
   <details><summary class="sumh">Auswertung</summary>
@@ -846,6 +891,7 @@ function openEdit(id){
       <div><label>Bezahlt</label><input id="e_pd" inputmode="numeric" value="${o.paid}"></div></div>
     ${o.inStock?`<div class="muted" style="margin-top:6px">📦 ${o.inStock} Stk. liegen für diese Bestellung im Lager bereit.</div>`:''}
     <label>Manueller Stückpreis (leer = Artikelpreis)</label><input id="e_man" inputmode="decimal" value="${o.manual==null?'':dec(o.manual)}">
+    ${discFields('e',o.disc)}
     <label>Notiz</label><input id="e_note" value="${esc(o.note)}">
     <div class="btns"><button class="btn" data-act="edit-save" data-id="${o.id}">Speichern</button><button class="btn sec" data-act="modal-close">Abbrechen</button>
     <button class="btn danger" data-act="edit-del" data-id="${o.id}" style="margin-left:auto">Löschen</button></div>`);
@@ -859,7 +905,9 @@ function saveEdit(id){
   if(!(pr>=0&&pr<=qty&&Number.isInteger(pr))) errs.push('Gedruckt: 0 bis Bestellt');
   if(!(pd>=0&&pd<=qty&&Number.isInteger(pd))) errs.push('Bezahlt: 0 bis Bestellt');
   if(man!==null&&(Number.isNaN(man)||man<0)) errs.push('Manueller Preis ungültig');
+  const disc=readDisc('e'); if(disc&&disc.err) errs.push(disc.err);
   if(errs.length) return toast(errs.join(' · '), true);
+  if(disc) o.disc=disc; else delete o.disc;
   if(editNr!==o.nr){ o.legacy=Math.max(0,o.printed-o.paid); o.inStock=0; o.nr=editNr; } // anderer Artikel: Reservierung lösen, Lager unverändert
   setPP(o, pr, pd);
   Object.assign(o,{buyer,date:$('#e_date').value||o.date,variant:$('#e_var').value.trim(),qty,manual:man,note:$('#e_note').value.trim()});
@@ -872,8 +920,10 @@ function saveNew(){
   if(!a) errs.push('Artikel wählen');
   if(m!==null&&(Number.isNaN(m)||m<0)) errs.push('Manueller Preis ungültig');
   if(a&&m==null&&usedPrice(a)==null) errs.push('Artikel hat keinen Preis – bitte manuell eingeben');
+  const disc=readDisc('f'); if(disc&&disc.err) errs.push(disc.err);
   if(errs.length) return toast(errs.join(' · '), true);
   const o={id:'o'+Date.now(),date:$('#f_date').value||today(),buyer,nr:a.nr,variant:$('#f_var').value.trim(),manual:m,qty:newQty,printed:0,paid:0,note:$('#f_note').value.trim(),inStock:0,legacy:0};
+  if(disc) o.disc=disc;
   const take=takeFromStock(o);
   S.orders.push(o); newNr=null; newQty=1;
   persist(); tab='start'; render(); window.scrollTo(0,0);
@@ -894,6 +944,7 @@ function openArt(nr){
       <div class="muted">kalkuliert ${a.calc==null?'–':EUR(a.calc)}${rw!=null?` · Richtwert ab 3 Stk.: ${EUR(rw)}`:''}</div></div>
     <label>Lager</label><div class="muted">Gesamt <b>${a.stock||0}</b> · frei <b>${freeStock(a)}</b> · reserviert <b>${reserved(a)}</b> · unterwegs <b>${inKomm(a)}</b></div>
     ${S.moves.some(m=>m.nr===a.nr)?`<details style="margin-top:6px"><summary class="muted" style="cursor:pointer">🕘 Letzte Lagerbewegungen</summary><div class="list" style="box-shadow:none;margin-top:6px">${moveRows(S.moves.filter(m=>m.nr===a.nr).slice(0,10))}</div></details>`:''}
+    <button class="btn sec big" data-act="recalc" data-nr="${a.nr}" style="margin-top:10px">🧮 Nachkalkulieren</button>
     <label>Manueller Preis (leer = Automatik)</label><input id="a_man" inputmode="decimal" value="${a.manual==null?'':dec(a.manual)}">
     <label style="display:flex;align-items:center;gap:10px;margin-top:14px"><input type="checkbox" id="a_active" ${a.active?'checked':''} style="width:22px;height:22px">Aktiv (wird bei neuen Bestellungen angeboten)</label>
     <div class="btns"><button class="btn" data-act="art-save" data-nr="${a.nr}">Speichern</button><button class="btn sec" data-act="modal-close">Abbrechen</button></div>`);
@@ -938,7 +989,7 @@ async function calcNew(btn){
   if(!name){ calcMsg('Bitte oben einen Artikelnamen eintragen.', true); $('#c_name').focus(); return; }
   const st=num($('#c_stock').value)||0;
   if(!(Number.isInteger(st)&&st>=0)){ calcMsg('Lager: ganze Zahl ≥ 0', true); return; }
-  const a={nr:nextNr(),name,variant:($('#c_var').value||'').trim(),calc:k.rund,manual:null,active:true,note:($('#c_note').value||'').trim(),N:k.strom,O:k.vers,S:k.kal,stock:st,img:null};
+  const a={nr:nextNr(),name,variant:($('#c_var').value||'').trim(),calc:k.rund,manual:null,active:true,note:($('#c_note').value||'').trim(),N:k.strom,O:k.vers,S:k.kal,stock:st,img:null,calcIn:readCalcInputs()};
   btn.disabled=true; await applyPhoto(a,'calc'); btn.disabled=false;
   S.articles.push(a); persist(); tab='artikel'; artFilter='aktiv'; render(); window.scrollTo(0,0);
   toast('Artikel '+a.nr+' „'+name+'“ angelegt ('+EUR(k.rund)+')');
@@ -1024,6 +1075,22 @@ function act(name, el){
     case 'art-new-save': saveArtNew(el); break;
     case 'calc-new': calcNew(el).catch(e=>calcMsg('Fehler: '+e.message, true)); break;
     case 'app-update': (async()=>{ try{ const rs=await navigator.serviceWorker?.getRegistrations?.(); for(const r of (rs||[])) await r.update(); const ks=await caches?.keys?.(); for(const k of (ks||[])) await caches.delete(k); }catch(e){} location.reload(); })(); break;
+    case 'disc': { const p=d.pre, v=d.v, dp=$('#'+p+'_dp'), da=$('#'+p+'_da'), dg=$('#'+p+'_dg'), dw=$('#'+p+'_dw');
+      if(v==='clear'){ dp.value=''; da.value=''; dg.checked=false; dw.value=''; }
+      else if(v==='gift'){ dg.checked=true; dp.value=''; da.value=''; if(!dw.value) dw.value='Geschenk'; }
+      else { dp.value=v; dg.checked=false; if(!dw.value) dw.value='Freundschaftspreis'; }
+      if(p==='f') updNeu(); break; }
+    case 'recalc': closeModal(); calcEdit=Number(d.nr); tab='mehr'; render(); setTimeout(()=>{ const b=$('#calc_box'); if(b) b.scrollIntoView({behavior:'smooth'}); },50); break;
+    case 'calc-cancel': calcEdit=null; render(); window.scrollTo(0,0); break;
+    case 'calc-apply': {
+      const a=art(calcEdit), k=kalk(); if(!a) break;
+      if(k.err || !(k.h>0)){ calcMsg(k.err||'Bitte Druckzeit eingeben (z. B. 1,5 Std.).', true); break; }
+      const old=a.calc;
+      Object.assign(a,{calc:k.rund,N:k.strom,O:k.vers,S:k.kal,calcIn:readCalcInputs()});
+      persist(); const nr=a.nr; calcEdit=null; tab='artikel'; render(); openArt(nr);
+      toast('Neu kalkuliert: '+(old==null?'–':EUR(old))+' → '+EUR(k.rund)+(a.manual!=null?' (Verkaufspreis bleibt manuell)':''));
+      break;
+    }
     case 'sync-now': closeModal(); lastErr=''; poll().then(()=>{ toast(live?'Verbunden ✓':'Noch keine Verbindung – Details oben antippen', !live); render(); }); break;
     case 'sync-reload': (async()=>{ try{ const txt=await call('getState'); stashLocal('Server-Stand geladen'); live=true; dirty=false; adopt(JSON.parse(txt)); closeModal(); render(); toast('Aktueller Stand geladen ✓'); }catch(e){ lastErr='Laden: '+errMsg(e); closeModal(); openSync(); } })(); break;
     case 'backup-json': backup('json'); toast('Sicherung wird heruntergeladen'); break;
@@ -1049,7 +1116,7 @@ function rerenderPhoto(t){
 
 document.addEventListener('click', e=>{
   const nb=e.target.closest('#nav [data-tab]');
-  if(nb){ tab=nb.dataset.tab; render(); window.scrollTo(0,0); return; }
+  if(nb){ tab=nb.dataset.tab; if(tab!=='mehr') calcEdit=null; render(); window.scrollTo(0,0); return; }
   const pk=e.target.closest('[data-pick]');
   if(pk && pick){ const it=pick.items[Number(pk.dataset.pick)], cb=pick.onPick; closePicker(); cb(it.value); return; }
   const ab=e.target.closest('[data-act]');
