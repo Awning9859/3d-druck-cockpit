@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#f6f3ee">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Trainingszeit">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icons/icon.svg">
+<title>Trainingszeit</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<div class="app">
+  <div class="topbar">
+    <div class="brand">
+      <svg width="30" height="20" viewBox="0 0 30 20" aria-hidden="true"><rect x="0" y="7" width="5" height="6" rx="2" fill="#c4592f"/><rect x="5" y="3" width="4" height="14" rx="2" fill="#c4592f"/><rect x="9" y="8" width="12" height="4" rx="2" fill="#c4592f"/><rect x="21" y="3" width="4" height="14" rx="2" fill="#c4592f"/><rect x="25" y="7" width="5" height="6" rx="2" fill="#c4592f"/></svg>
+      <span>Trainingszeit</span>
+    </div>
+    <button class="icon-btn" id="btnSettings" aria-label="Einstellungen"><svg class="i" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg></button>
+  </div>
+  <main id="main"></main>
+</div>
+<nav class="tabs" id="tabs" role="navigation" aria-label="Hauptnavigation">
+  <button data-route="today" class="on"><svg class="i" viewBox="0 0 24 24"><path d="M3 11l9-7 9 7"/><path d="M5 10v10h14V10"/></svg>Heute</button>
+  <button data-route="plan"><svg class="i" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="3"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>Wochenplan</button>
+  <button data-route="history"><svg class="i" viewBox="0 0 24 24"><path d="M5 20V12M12 20V5M19 20v-6"/></svg>Verlauf</button>
+</nav>
+<div id="overlay"></div>
+<div id="toast" class="toast" hidden></div>
+<script src="config.js"></script>
+<script src="data.js"></script>
+<script src="logic.js"></script>
+<script src="calendar.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
