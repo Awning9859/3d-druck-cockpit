@@ -33,6 +33,7 @@
     const wd = weekdayOf(dateStr);
     return long ? `${WEEKDAYS_LONG[wd]}, ${d}. ${MONTHS[m - 1]}` : `${WEEKDAYS[wd]}, ${String(d).padStart(2, '0')}.${String(m).padStart(2, '0')}.`;
   }
+  function num(v) { return v == null ? '' : String(v).replace('.', ','); }
   function fmtTime(iso) { return iso ? berlinOf(iso).time : '–'; }
   function fmtDuration(sec) { const m = Math.floor(sec / 60), s = Math.abs(sec % 60); return `${m}:${String(s).padStart(2, '0')}`; }
 
@@ -172,7 +173,73 @@
       }
     }
     state.sessions.sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
+    reassignStrengthTypes(state, today);
     return state;
+  }
+
+  // Künftige, noch geplante Krafteinheiten wechseln A/B ab, beginnend nach der letzten Einheit mit Fortschritt
+  // (abgeschlossen oder begonnen). Hat die Einheit abweichend (z. B. B statt A) stattgefunden, folgt der Plan dem.
+  function reassignStrengthTypes(state, today) {
+    let next = nextStrengthType(state.sessions);
+    const future = state.sessions
+      .filter(s => s.source === 'plan' && s.status === 'geplant' && (s.type === 'A' || s.type === 'B') && s.date >= today)
+      .sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
+    for (const s of future) { s.type = next; next = next === 'A' ? 'B' : 'A'; }
+    return state;
+  }
+
+  // Ungeplante Einheit (spontan oder nachgetragen). Die ID bleibt eindeutig und stabil.
+  function createUnplanned(state, date, type, source) {
+    let id = `s-${date}-${type}-${source}`;
+    let n = 2;
+    while (state.sessions.some(s => s.id === id)) id = `s-${date}-${type}-${source}${n++}`;
+    const s = newSession(date, type, { id, source, status: 'geplant', plannedTime: null });
+    state.sessions.push(s);
+    state.sessions.sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
+    return s;
+  }
+
+  // Momentaufnahme der künftigen Planung: Reihenfolge und Ziele je Einheit
+  function planSnapshot(state, today) {
+    const out = {};
+    state.sessions
+      .filter(s => s.status === 'geplant' && (s.type === 'A' || s.type === 'B') && s.date >= today)
+      .forEach(s => {
+        out[s.id] = {
+          date: s.date, type: s.type,
+          exercises: buildExercises(state, s.type).map(e => ({ id: e.exerciseId, goal: e.target.goal, weight: e.target.weight, sets: e.target.sets }))
+        };
+      });
+    return out;
+  }
+
+  // Unterschiede zwischen zwei Momentaufnahmen, mit dem letzten Grund je Übung
+  function diffPlans(prev, next, adjustments) {
+    const lines = [];
+    const reasonFor = exId => {
+      const a = (adjustments || []).filter(x => x.exerciseId === exId && !x.undone).pop();
+      return a ? a.reason : null;
+    };
+    const nameOf = id => (EXERCISES[id] || { name: id }).name;
+    for (const id of Object.keys(next)) {
+      const n = next[id];
+      const p = prev && prev[id];
+      const when = fmtDate(n.date, false);
+      if (!p) { lines.push({ kind: 'neu', text: `${when}: ${KIND_LABEL[n.type]} neu im Plan` }); continue; }
+      if (p.type !== n.type) {
+        lines.push({ kind: 'reihenfolge', text: `${when}: ${KIND_LABEL[p.type]} wird ${KIND_LABEL[n.type]}, weil sich die letzte abgeschlossene Krafteinheit geändert hat.` });
+        continue;
+      }
+      for (const e of n.exercises) {
+        const pe = p.exercises.find(x => x.id === e.id);
+        if (!pe) { lines.push({ kind: 'uebung', text: `${when}: ${nameOf(e.id)} neu in ${KIND_LABEL[n.type]}` }); continue; }
+        if (pe.goal !== e.goal || pe.weight !== e.weight) {
+          const w = pe.weight !== e.weight ? `, ${num(pe.weight)} kg → ${num(e.weight)} kg` : '';
+          lines.push({ kind: 'ziel', exerciseId: e.id, text: `${nameOf(e.id)} (${when}): ${pe.goal} → ${e.goal} Wdh.${w}`, reason: reasonFor(e.id) });
+        }
+      }
+    }
+    return lines;
   }
 
   // Ablauf einer Einheit beim Start: Ziele werden aus dem aktuellen Verlauf übernommen
@@ -534,7 +601,8 @@
     adjustFromSession, acceptProposal, undoAdjustment, exerciseHistory,
     calendarEventId, eventBody, planCalendarOps, hash,
     exportPayload, validateImport, importPayload, initialState, templateSlots, KIND_LABEL,
-    planSlots, hasPreviousData, pruneFuturePlanned, berlinIso
+    planSlots, hasPreviousData, pruneFuturePlanned, berlinIso,
+    reassignStrengthTypes, createUnplanned, planSnapshot, diffPlans
   };
   if (typeof module === 'object' && module.exports) module.exports = api;
   root.HT_LOGIC = api;

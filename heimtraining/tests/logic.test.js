@@ -326,3 +326,49 @@ test('Zeitzone: Berlin-Datum vor Mitternacht UTC', () => {
   assert.equal(L.berlinOf('2026-11-21T23:30:00Z').date, '2026-11-22');
   assert.equal(L.fmtTime('2026-11-18T15:25:00Z'), '16:25');
 });
+
+test('Abweichend absolviert: A geplant, B gemacht -> Verlauf zeigt B, nächste Einheit wird A', () => {
+  const s = fresh();
+  L.ensurePlan(s, TODAY, 28);
+  const a21 = s.sessions.find(x => x.id === 's-2026-11-21');
+  assert.equal(a21.type, 'A');
+  // Nutzer macht stattdessen B und schließt ab
+  a21.type = 'B';
+  L.startSession(s, a21, NOW, null);
+  a21.exercises.forEach((ex, e) => ex.sets.forEach((_, i) => L.logSet(a21, e, i, { reps: 10 })));
+  L.completeSession(a21, { endedAt: '2026-11-21T15:00:00+01:00' });
+  L.ensurePlan(s, TODAY, 28);
+  const nextPlanned = s.sessions.filter(x => x.status === 'geplant' && (x.type === 'A' || x.type === 'B') && x.date > TODAY).sort((x, y) => (x.date < y.date ? -1 : 1));
+  assert.equal(nextPlanned[0].type, 'A', 'nach B folgt A');
+  assert.equal(nextPlanned[1].type, 'B');
+  assert.equal(a21.type, 'B', 'abgeschlossene Einheit bleibt wie gemacht');
+});
+
+test('Plan-Vergleich: Zieländerung nennt Übung, Termin und Grund', () => {
+  const s = fresh();
+  L.ensurePlan(s, TODAY, 28);
+  const before = L.planSnapshot(s, TODAY);
+  s.adjustments.push({ id: 'x', exerciseId: 'kb_deadlift', reason: 'Testgrund', undone: false, auto: true });
+  s.targets.kb_deadlift = { ...L.currentTarget(s, 'kb_deadlift'), goal: 9 };
+  const after = L.planSnapshot(s, TODAY);
+  const lines = L.diffPlans(before, after, s.adjustments);
+  const hit = lines.find(l => l.exerciseId === 'kb_deadlift');
+  assert.ok(hit, 'Kreuzheben-Änderung erscheint');
+  assert.ok(hit.text.includes('10 → 9 Wdh.'));
+  assert.equal(hit.reason, 'Testgrund');
+  assert.equal(L.diffPlans(after, after, []).length, 0, 'ohne Änderung keine Zeilen');
+});
+
+test('Ungeplante Einheiten erhalten eindeutige IDs', () => {
+  const s = fresh();
+  const a = L.createUnplanned(s, '2026-11-24', 'A', 'spontan');
+  const b = L.createUnplanned(s, '2026-11-24', 'A', 'spontan');
+  assert.notEqual(a.id, b.id);
+  assert.equal(a.source, 'spontan');
+});
+
+test('Plan: keine Krafteinheit am Montag, Dienstag oder Donnerstag mit Standardzeiten', () => {
+  const s = fresh();
+  L.ensurePlan(s, TODAY, 28);
+  assert.ok(!s.sessions.some(x => (x.type === 'A' || x.type === 'B') && x.source === 'plan' && [1, 2, 4].includes(L.weekdayOf(x.date))));
+});

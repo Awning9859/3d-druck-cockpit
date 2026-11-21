@@ -59,8 +59,8 @@
       <rect width="400" height="210" fill="url(#g2)"/>
       <rect x="60" y="150" width="280" height="22" rx="11" fill="#2b2f2e" opacity=".85"/>
       <rect x="40" y="172" width="320" height="12" rx="6" fill="#b9d3c6"/>
-      <path d="M170 100 L210 60 L240 90 L270 60" fill="none" stroke="#c4592f" stroke-width="12" stroke-linecap="round" stroke-linejoin="round"/>
-      <circle cx="196" cy="78" r="12" fill="#c4592f"/>
+      <path d="M170 100 L210 60 L240 90 L270 60" fill="none" stroke="#BC583B" stroke-width="12" stroke-linecap="round" stroke-linejoin="round"/>
+      <circle cx="196" cy="78" r="12" fill="#BC583B"/>
     </svg>`;
   }
 
@@ -97,11 +97,11 @@
   function label(type) { return L.KIND_LABEL[type] || 'Training'; }
   function tagFor(status) {
     const map = {
-      abgeschlossen: ['ok', 'Abgeschlossen'], teilweise: ['warn', 'Teilweise'], abgebrochen: ['bad', 'Abgebrochen'],
-      begonnen: ['warn', 'Offen'], geplant: ['', 'Geplant'], verschoben: ['mute', 'Verschoben'], ausgelassen: ['mute', 'Ausgelassen']
+      abgeschlossen: ['ok', '✓', 'Abgeschlossen'], teilweise: ['warn', '◐', 'Teilweise absolviert'], abgebrochen: ['bad', '✕', 'Abgebrochen'],
+      begonnen: ['warn', '●', 'Läuft / offen'], geplant: ['', '○', 'Geplant'], verschoben: ['mute', '→', 'Verschoben'], ausgelassen: ['mute', '–', 'Ausgelassen']
     };
-    const [cls, text] = map[status] || ['mute', status];
-    return `<span class="tag ${cls}">${esc(text)}</span>`;
+    const [cls, sym, text] = map[status] || ['mute', '?', status];
+    return `<span class="tag ${cls}">${esc(sym)} ${esc(text)}</span>`;
   }
   function weightText(ex, w) {
     if (w == null) return '';
@@ -161,6 +161,8 @@
     } else {
       h += strengthHero(s);
     }
+    h += `<div class="row" style="gap:10px;margin-top:4px"><button class="btn light small grow" data-act="spontan">Spontan trainieren</button>
+      <button class="btn light small grow" data-act="nachtrag">Einheit nachtragen</button></div>`;
     const last = state.sessions
       .filter(x => ['abgeschlossen', 'teilweise', 'abgebrochen'].includes(x.status))
       .sort(byDateDesc)[0];
@@ -263,6 +265,7 @@
     h += `<div class="week-nav"><button class="icon-btn" data-act="week" data-d="-7" aria-label="Vorwoche">${icon('back')}</button>
       <strong>${esc(weekLabel)}</strong>
       <button class="icon-btn" data-act="week" data-d="7" aria-label="Nächste Woche"><svg class="i" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></button></div>`;
+    h += `<button class="btn ghost small" style="margin:0 0 12px" data-act="recalc">Plan neu berechnen</button>`;
     if (!list.length) h += `<div class="card empty">Keine Termine in dieser Woche.</div>`;
     h += list.map(s => planRow(s)).join('');
     h += calendarTile();
@@ -368,9 +371,9 @@
     const xs = (i) => pad + (pts.length === 1 ? (w - 2 * pad) / 2 : i * (w - 2 * pad) / (pts.length - 1));
     const ys = (v) => hgt - pad - ((v - min) / ((max - min) || 1)) * (hgt - 2 * pad);
     const d = pts.map((v, i) => `${i ? 'L' : 'M'}${xs(i).toFixed(1)} ${ys(v).toFixed(1)}`).join(' ');
-    const dots = pts.map((v, i) => `<circle cx="${xs(i).toFixed(1)}" cy="${ys(v).toFixed(1)}" r="4" fill="#c4592f"/><text x="${xs(i).toFixed(1)}" y="${(ys(v) - 8).toFixed(1)}" text-anchor="middle" font-size="11" fill="#0f3b35">${v}</text>`).join('');
+    const dots = pts.map((v, i) => `<circle cx="${xs(i).toFixed(1)}" cy="${ys(v).toFixed(1)}" r="4" fill="#BC583B"/><text x="${xs(i).toFixed(1)}" y="${(ys(v) - 8).toFixed(1)}" text-anchor="middle" font-size="11" fill="#163C39">${v}</text>`).join('');
     return `<div class="card"><div class="muted" style="margin-bottom:4px">Schlechtester Satz je Einheit</div>
-      <svg class="bar-chart" viewBox="0 0 ${w} ${hgt}" role="img" aria-label="Verlauf"><path d="${d}" fill="none" stroke="#0f3b35" stroke-width="2"/>${dots}</svg></div>`;
+      <svg class="bar-chart" viewBox="0 0 ${w} ${hgt}" role="img" aria-label="Verlauf"><path d="${d}" fill="none" stroke="#163C39" stroke-width="2"/>${dots}</svg></div>`;
   }
 
   function viewSettings() {
@@ -380,6 +383,7 @@
     const cfg = C.configured();
     return `<div class="row" style="margin-top:12px"><button class="icon-btn" data-act="backToday" aria-label="Zurück">${icon('back')}</button><h1 style="margin:0 0 0 4px;font-size:28px">Einstellungen</h1></div>
       <h2 class="section">Trainingszeiten</h2>
+      ${st.slots.some(x => [1, 2, 4].includes(x.weekday)) ? `<div class="banner">Montag, Dienstag oder Donnerstag ist für Krafttraining eingetragen. Dienstag sollte möglichst frei bleiben.</div>` : ''}
       <div class="card">
         ${st.slots.map((s, i) => `<div class="row" style="margin-bottom:12px;flex-wrap:wrap">
           <div class="grow field" style="margin:0;min-width:140px"><label>Krafttraining ${i + 1}</label><select data-field="slotDay" data-i="${i}">${dayOpts(s.weekday)}</select></div>
@@ -417,7 +421,7 @@
     if (!s) return;
     if (s.type === 'cardio') { startCardio(s); return; }
     const preview = L.buildExercises(state, s.type);
-    pre = { id, feeling: null, knee: false, leftHand: false, choices: {} };
+    pre = { id, feeling: null, knee: false, leftHand: false, choices: {}, type: s.type, probe: {} };
     preRender(preview);
   }
   function preRender(preview) {
@@ -432,7 +436,12 @@
       return d.equipment.includes('kettlebell') && !L.hasPreviousData(state.sessions, e.exerciseId, s.id);
     });
     const chipsFeel = [1, 2, 3, 4, 5].map(v => `<button class="chip ${pre.feeling === v ? 'on' : ''}" data-act="preFeel" data-v="${v}">${v}</button>`).join('');
-    const body = `<h3>${esc(label(s.type))} starten</h3>
+    const isStrength = s.type === 'A' || s.type === 'B';
+    const typeChips = isStrength && s.status === 'geplant' ? `<div class="field"><span class="flbl">Einheit</span><div class="chips">${['A', 'B'].map(t => `<button class="chip ${pre.type === t ? 'on' : ''}" data-act="preType" data-v="${t}">Krafttraining ${t}</button>`).join('')}</div>
+        <div class="muted" style="margin-top:6px">Wenn du heute die andere Einheit machst, folgt der Plan dieser Wahl.</div></div>` : '';
+    const probeList = newKb.length ? `<h2 class="section">Technikprobe</h2>` + newKb.map(e => `<label class="check"><input type="checkbox" data-act="preProbe" data-ex="${e.exerciseId}" ${pre.probe[e.exerciseId] ? 'checked' : ''}> Griff und Bewegung für ${esc(D.EXERCISES[e.exerciseId].name)} geprüft</label>`).join('') + `<div class="muted">Ohne Technikprobe startet diese Übung ohne Gewicht.</div>` : '';
+    const body = `<h3>${esc(label(pre.type || s.type))} starten</h3>
+      ${typeChips}
       <div class="field"><span class="flbl">Wie fühlst du dich? (1 schlecht – 5 sehr gut, optional)</span><div class="chips">${chipsFeel}</div></div>
       <div class="toggle"><span>Beschwerden am Knie</span><input type="checkbox" data-act="preToggle" data-k="knee" ${pre.knee ? 'checked' : ''}></div>
       <div class="toggle"><span>Beschwerden an der linken Hand</span><input type="checkbox" data-act="preToggle" data-k="leftHand" ${pre.leftHand ? 'checked' : ''}></div>
@@ -446,10 +455,70 @@
         opts.push(['skip', 'Auslassen']);
         return `<div class="field"><span class="flbl">${esc(d.name)}</span><div class="chips">${opts.map(([k, t]) => `<button class="chip ${cur === k ? 'on' : ''}" data-act="preChoice" data-ex="${e.exerciseId}" data-c="${k}">${t}</button>`).join('')}</div></div>`;
       }).join('') : ''}
-      ${newKb.length ? `<div class="banner">Neue Kettlebell-Übung: Griff und kontrollierte Ausführung zuerst prüfen, notfalls mit leichterer Last beginnen (${newKb.map(e => esc(D.EXERCISES[e.exerciseId].name)).join(', ')}).</div>` : ''}
+      ${probeList}
       <button class="btn" data-act="preStart">${icon('play')}Training starten</button>
       <button class="btn ghost" data-act="close" style="margin-top:8px">Abbrechen</button>`;
     openOrUpdateSheet(body);
+  }
+
+  function spontanSheet() {
+    const next = L.nextStrengthType(state.sessions);
+    openSheet(`<h3>Spontan trainieren</h3>
+      <div class="muted" style="margin-bottom:12px">Die Einheit startet sofort und wird mit der Startzeit gespeichert.</div>
+      <div class="chips" style="margin-bottom:14px">${['A', 'B'].map(t => `<button class="chip ${t === next ? 'on' : ''}" data-act="spontanStart" data-v="${t}">Krafttraining ${t}</button>`).join('')}</div>
+      <button class="btn ghost" data-act="close">Abbrechen</button>`);
+  }
+  function spontanStart(type) {
+    const s = L.createUnplanned(state, today(), type, 'spontan');
+    L.startSession(state, s, nowIso(), null);
+    ui.open = s.id;
+    persist(); closeSheet(); render();
+  }
+
+  let ntType = 'A';
+  function nachtragSheet() {
+    ntType = 'A';
+    openSheet(`<h3>Einheit nachtragen</h3>
+      <div class="muted" style="margin-bottom:12px">Für eine Einheit, die du ohne App gemacht hast. Danach erfasst du Sätze und Zeiten wie sonst.</div>
+      <div class="field"><label for="ntDate">Datum</label><input type="date" id="ntDate" value="${esc(today())}"></div>
+      <div class="field"><label for="ntTime">Startzeit</label><input type="time" id="ntTime" value="16:00"></div>
+      <div class="field"><span class="flbl">Einheit</span><div class="chips">
+        <button class="chip on" data-act="ntType" data-v="A">Krafttraining A</button>
+        <button class="chip" data-act="ntType" data-v="B">Krafttraining B</button>
+        <button class="chip" data-act="ntType" data-v="cardio">Ausdauer</button></div></div>
+      <button class="btn" data-act="nachtragStart">Weiter zur Erfassung</button>
+      <button class="btn ghost" data-act="close" style="margin-top:8px">Abbrechen</button>`);
+  }
+  function setNtType(v) {
+    ntType = v;
+    document.querySelectorAll('[data-act="ntType"]').forEach(b => b.classList.toggle('on', b.dataset.v === v));
+  }
+  function nachtragStart() {
+    const date = (document.getElementById('ntDate') || {}).value || today();
+    const time = (document.getElementById('ntTime') || {}).value || '16:00';
+    const s = L.createUnplanned(state, date, ntType, 'nachtrag');
+    s.retro = true;
+    if (ntType === 'cardio') s.cardioMode = 'joggen';
+    L.startSession(state, s, L.berlinIso(date, time), null);
+    ui.open = s.id;
+    persist(); closeSheet(); render();
+  }
+
+  function recalcPlan() {
+    const t = today();
+    L.ensurePlan(state, t, 28);
+    L.pruneFuturePlanned(state, t, 28);
+    L.ensurePlan(state, t, 28);
+    const next = L.planSnapshot(state, t);
+    const lines = state.planSnapshot ? L.diffPlans(state.planSnapshot, next, state.adjustments) : null;
+    state.planSnapshot = next;
+    persist(); render();
+    const body = lines === null
+      ? `<div class="muted">Der Plan wurde berechnet. Ab jetzt zeigt jede Neuberechnung, was sich ändert.</div>`
+      : lines.length
+        ? lines.map(l => `<div class="note-box">${esc(l.text)}${l.reason ? `<div class="muted" style="margin-top:4px">Grund: ${esc(l.reason)}</div>` : ''}</div>`).join('')
+        : `<div class="muted">Seit der letzten Berechnung hat sich nichts geändert.</div>`;
+    openSheet(`<h3>Plan neu berechnet</h3>${body}<button class="btn" data-act="close" style="margin-top:12px">Fertig</button>`);
   }
 
   function startCardio(s) {
@@ -463,8 +532,17 @@
   function beginSession() {
     const s = find(pre.id);
     if (!s) return;
+    if (s.status === 'geplant' && pre.type && (s.type === 'A' || s.type === 'B')) s.type = pre.type;
     L.startSession(state, s, nowIso(), { knee: pre.knee, leftHand: pre.leftHand, feeling: pre.feeling });
     s.feeling = pre.feeling;
+    // Neue Kettlebell-Übungen ohne Technikprobe starten ohne Gewicht
+    s.exercises.forEach(ex => {
+      const def = D.EXERCISES[ex.exerciseId];
+      if (def.equipment.includes('kettlebell') && !L.hasPreviousData(state.sessions, ex.exerciseId, s.id) && !pre.probe[ex.exerciseId]) {
+        ex.sets.forEach(x => { if (x.status === 'offen') x.weight = null; });
+        ex.note = 'Technikprobe ausstehend: ohne Gewicht gestartet';
+      }
+    });
     s.exercises.forEach((ex, idx) => {
       const c = pre.choices[ex.exerciseId];
       const def = D.EXERCISES[ex.exerciseId];
@@ -606,7 +684,7 @@
     const focus = finished
       ? `<div class="ex-name">Geschafft</div>`
       : `<div class="ex-name">${esc(cur.label)}</div><div class="center muted">${esc(cur.speed)}</div>
-         <div class="timer"><div class="muted">verstrichen bis ${clockOf(cur.sec)}</div><div class="big" id="timerBig">${clockOf(cur.inBlock)}</div><div class="muted">noch ${clockOf(cur.sec - cur.inBlock)} bis zum Wechsel</div></div>`;
+         <div class="timer"><div class="big" id="timerBig">${clockOf(cur.inBlock)}</div><div class="muted" style="font-size:18px;font-weight:700;color:var(--ink)">${esc(cur.speed)} bis ${clockOf(cur.sec)}</div><div class="muted">noch ${clockOf(cur.sec - cur.inBlock)} bis zum Wechsel</div></div>`;
     return `<div class="runner"><div class="inner">
       <div class="head"><button class="icon-btn" data-act="leave" aria-label="Später fortsetzen">${icon('back')}</button><h2>Ausdauer</h2><span></span></div>
       <div class="ctx">Gesamt ${clockOf(elapsed)} von ${clockOf(total)}</div>
@@ -773,6 +851,8 @@
       <div class="field"><span class="flbl">Technik</span><div class="chips">
         <button class="chip ${e.technique === 'gut' ? 'on' : ''}" data-act="rirTech" data-ex="${exIdx}" data-v="gut">Gut</button>
         <button class="chip warnchip ${e.technique === 'unsicher' ? 'on' : ''}" data-act="rirTech" data-ex="${exIdx}" data-v="unsicher">Unsicher</button></div></div>
+      <div class="field"><span class="flbl">Anstrengung dieser Übung (0–10, optional)</span><div class="chips">${[0, 2, 4, 6, 8, 10].map(v => `<button class="chip ${e.effort === v ? 'on' : ''}" data-act="rirEffort" data-ex="${exIdx}" data-v="${v}">${v}</button>`).join('')}</div>
+        <div class="muted" style="margin-top:6px">Getrennt von der Gesamtanstrengung der Einheit.</div></div>
       <div class="toggle"><span>Schmerzen bei dieser Übung</span><input type="checkbox" data-act="rirPain" data-ex="${exIdx}" ${e.pain ? 'checked' : ''}></div>
       <button class="btn" data-act="rirSave" data-ex="${exIdx}">Speichern</button>
       <button class="btn ghost" data-act="close" style="margin-top:8px">Keine Angabe</button>`);
@@ -996,6 +1076,14 @@
       case 'preToggle': pre[el.dataset.k] = el.checked; preRender(); return;
       case 'preChoice': pre.choices[el.dataset.ex] = el.dataset.c; preRender(); return;
       case 'preStart': beginSession(); return;
+      case 'preType': pre.type = el.dataset.v; preRender(); return;
+      case 'spontan': spontanSheet(); return;
+      case 'spontanStart': spontanStart(el.dataset.v); return;
+      case 'nachtrag': nachtragSheet(); return;
+      case 'nachtragStart': nachtragStart(); return;
+      case 'recalc': recalcPlan(); return;
+      case 'ntType': setNtType(el.dataset.v); return;
+      case 'rirEffort': { const s = find(ui.open); s.exercises[Number(el.dataset.ex)].effort = Number(el.dataset.v); rirSheet(ui.open, Number(el.dataset.ex)); return; }
       case 'done': actDone(find(ui.open)); return;
       case 'leave': ui.open = null; render(); toast('Gespeichert. Du kannst später weitermachen.'); return;
       case 'cues': cuesSheet(); return;
@@ -1174,6 +1262,7 @@
   document.addEventListener('change', e => {
     const el = e.target;
     if (el.dataset && el.dataset.act === 'preToggle') { pre[el.dataset.k] = el.checked; preRender(); }
+    if (el.dataset && el.dataset.act === 'preProbe') { pre.probe[el.dataset.ex] = el.checked; }
   });
 
   function mediaSave() {

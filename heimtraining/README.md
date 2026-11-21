@@ -14,6 +14,14 @@ Ordner: `heimtraining/` im Repository. Die bestehende 3D-Druck-App im Root bleib
 - **Verlauf**: alle Einheiten mit Details, je Übung eine Kurve des schlechtesten Satzes, und alle automatischen Anpassungen mit „Rückgängig“.
 - **Ausdauer**: 32 Minuten (5 Min. Einlaufen, 4 × 4 Min. Slow Jogging mit 2 Min. Gehen dazwischen, 5 Min. Auslaufen). Alternativen: zügiges Gehen oder lockeres Rudern. Die Anzeige zeigt die verstrichene Zeit bis zum nächsten Wechsel.
 - **Export und Import**: JSON-Datei mit allen Daten, Import ersetzt die Daten nach Bestätigung.
+- **Spontan trainieren**: Startet sofort eine A- oder B-Einheit und speichert die Startzeit.
+- **Einheit nachtragen**: Datum, Startzeit und Einheit angeben, danach erfasst du Sätze und Zeiten wie sonst.
+- **Abweichend trainieren**: Beim Start kannst du zwischen A und B wählen. Der Plan folgt danach der tatsächlich abgeschlossenen Einheit.
+- **Technikprobe**: Neue Kettlebell-Übungen starten ohne Gewicht, bis du Griff und Bewegung bestätigt hast.
+- **Plan neu berechnen**: Zeigt, welche Ziele, Gewichte oder Reihenfolgen sich geändert haben und warum.
+- **Hinweis Dienstag**: Krafttraining am Dienstag, Montag oder Donnerstag löst einen Hinweis in den Einstellungen aus.
+- **Statusangaben** haben immer Symbol und Text: ✓ abgeschlossen, ◐ teilweise, ✕ abgebrochen, ● offen, ○ geplant.
+- **Schrift und Farben**: DM Sans (von Google Fonts, ohne Internet fällt die Systemschrift zurück), Creme, Petrol, Salbei und Terrakotta.
 
 ## Einrichten und auf dem Handy nutzen
 
@@ -50,6 +58,8 @@ Jede Übung wird nur anhand des eigenen Verlaufs angepasst. Die Gesamtanstrengun
 | R5 Schmerz oder unsichere Technik | Keine Steigerung. Die App bietet eine leichtere Variante an. |
 | R6 Neue Übung | Die erste Messung ist nur Ausgangspunkt, es gibt noch keine Änderung und keine Reserve-Frage. Fehlende Angaben ändern nichts. |
 | R7 Trennung | Jede Übung hat ihren eigenen Verlauf. Grundübungen bleiben vergleichbar, Varianten bringen Abwechslung. |
+
+Der Plan richtet A und B nach der letzten **abgeschlossenen** oder begonnenen Krafteinheit aus. Wenn du heute B statt A machst, werden die künftigen Termine neu abgewechselt. Abgeschlossene Einheiten bleiben unverändert.
 
 Beispiel aus deinen Daten: Kreuzheben stand am 18.11. bei 2 × 8 mit 8 kg. Der Plan will 2 × 10–12. Die Vorlage setzt das Ziel auf 10. Wird der Satz wieder unter 10 gemacht, wird das Ziel auf 9 gesetzt, dann auf 10 gehoben. Im Verlauf unter „Übungen“ siehst du, wann welche Wiederholungszahl erreicht wurde.
 
@@ -94,7 +104,8 @@ Ohne Einrichtung funktioniert die App vollständig. Nur die Kalenderfunktionen b
 ## Was getestet wurde
 
 **Automatisch geprüft (Node und Browser, siehe `tests/`):**
-- `node --test tests/logic.test.js`: 22 Prüfungen der Logik. Dazu gehören Startdaten, Plan (Mi/Fr, A/B-Wechsel), Satzsteuerung, Übung wechseln ohne Änderung anderer Übungen, Abschluss mit fehlenden Werten, alle Anpassungsregeln inkl. Rückgängig, Kalenderereignisse mit stabiler ID, Import/Export und Zeitzone.
+- `node --test tests/logic.test.js`: 26 Prüfungen der Logik. Dazu gehören Startdaten, Plan (Mi/Fr, A/B-Wechsel), Satzsteuerung, Übung wechseln ohne Änderung anderer Übungen, Abschluss mit fehlenden Werten, alle Anpassungsregeln inkl. Rückgängig, Kalenderereignisse mit stabiler ID, Import/Export und Zeitzone.
+- `tests/e2e-flows.js`: 7 Ablaufprüfungen. Abweichende Einheit (A geplant, B gemacht) verschiebt die Reihenfolge, spontan, nachtragen, Plan neu berechnen.
 - `tests/e2e.js` (Browser, Handy-Breite 390 px): Heute, Wochenplan, Verlauf, Satz-Ansicht, Neuladen mitten im Training, Satz überspringen, Abschluss, Export, Import, keine Laufzeitfehler.
 - `tests/e2e-calendar.js`: 16 Prüfungen der Kalender-Synchronisation gegen eine **gefälschte** Google-API im Test. Geprüft werden Kalender anlegen, Termin anlegen, Verschieben mit gleicher ID, Abschluss mit ✓ und Ist-Zeit, Ausfallen lassen mit Löschung, Wiederholung ohne Duplikat und das Verhalten bei Fehlern.
 
