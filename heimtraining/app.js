@@ -1,7 +1,7 @@
-/* Oberfläche. Logik liegt in logic.js, Google-Anbindung in calendar.js. */
+/* Oberfläche. Logik liegt in logic.js. Kalender-Export als .ics, ohne Google-Anbindung. */
 (function () {
   'use strict';
-  const L = window.HT_LOGIC, D = window.HT_DATA, C = window.HT_CAL;
+  const L = window.HT_LOGIC, D = window.HT_DATA;
   const KEY = 'heimtraining.v1', UIKEY = 'heimtraining.ui.v1';
   const $ = (s, r) => (r || document).querySelector(s);
 
@@ -9,8 +9,6 @@
   const ui = { route: 'today', open: null, weekStart: null, histTab: 'sessions', histEx: 'kb_deadlift', histSession: null };
   let draft = {};        // ungespeicherte Eingaben im Satz-Bildschirm
   let pre = null;        // Zustand des Vorab-Dialogs
-  let busy = null;       // Belegt-Zeiten für die Woche (nur mit Freigabe)
-  let busyWeek = null;
   let sheetEl = null;
   let tick = null;
   let toastTimer = null;
@@ -272,19 +270,9 @@
     return h;
   }
 
-  function sessionSpan(s) {
-    const start = s.startedAt || (s.plannedTime ? L.berlinIso(s.date, s.plannedTime) : null);
-    if (!start) return null;
-    const dur = s.type === 'cardio' ? 32 : 40;
-    return { start: Date.parse(start), end: Date.parse(start) + dur * 60000 };
-  }
   function planRow(s) {
     const isCardio = s.type === 'cardio';
-    let conflict = '';
-    if (busy && s.status === 'geplant' && s.plannedTime) {
-      const span = sessionSpan(s);
-      if (span && busy.some(b => span.start < Date.parse(b.end) && span.end > Date.parse(b.start))) conflict = `<span class="tag warn">Belegt laut Kalender</span>`;
-    }
+    const conflict = '';
     const time = s.startedAt ? `${berlinHM(s.startedAt)} Uhr` : (s.plannedTime ? `${s.plannedTime} Uhr` : 'Zeit offen');
     return `<button class="list-item ${['abgeschlossen', 'teilweise'].includes(s.status) ? 'done' : ''}" data-act="detail" data-id="${esc(s.id)}">
       <span class="ico">${icon(isCardio ? 'bolt' : 'cal')}</span>
@@ -295,27 +283,12 @@
   }
 
   function calendarTile() {
-    const cal = state.settings.calendar;
-    const ops = L.planCalendarOps(state);
-    const errs = state.sessions.filter(s => s.calendar && s.calendar.error).length;
-    let status, action = '';
-    if (!C.configured()) {
-      status = 'Nicht eingerichtet. Die Anleitung steht im README.';
-    } else if (!C.isConnected()) {
-      status = 'Nicht verbunden. Die Verbindung gilt für diese Browser-Sitzung.';
-      action = `<button class="btn small" data-act="gconnect">Mit Google verbinden</button>`;
-    } else if (ops.length || errs) {
-      status = `${ops.length} Vorgänge ausstehend${errs ? ` · ${errs} mit Fehler` : ''}`;
-      action = `<button class="btn small" data-act="gpreview">Vorschau & eintragen</button>`;
-    } else {
-      status = 'Synchron';
-      action = `<button class="btn light small" data-act="gpreview">Vorschau anzeigen</button>`;
-    }
-    return `<h2 class="section">Google Kalender</h2>
-      <div class="card"><div class="row"><span class="ico" style="width:40px;height:40px;border-radius:12px;background:var(--mint);display:grid;place-items:center">${icon('cal')}</span>
-        <div class="grow"><div class="title">Trainingskalender</div><div class="muted">${esc(status)}</div></div></div>
-        ${action ? `<div style="margin-top:10px">${action}</div>` : ''}
-        ${cal.freeBusy ? `<button class="btn ghost small" style="margin-top:10px" data-act="busy">Belegt-Zeiten aktualisieren</button>` : ''}
+    const n = L.icsEvents(state).length;
+    return `<h2 class="section">Kalender</h2>
+      <div class="card"><div class="row"><span style="width:40px;height:40px;border-radius:12px;background:var(--mint);display:grid;place-items:center">${icon('cal')}</span>
+        <div class="grow"><div class="title">Kalender-Datei (.ics)</div><div class="muted">${n} Termine in der Datei. Kostenlos, ohne Google-Anmeldung.</div></div></div>
+        <button class="btn small" style="margin-top:10px" data-act="icsExport">Kalender-Datei herunterladen</button>
+        <div class="muted" style="margin-top:10px">Die Datei öffnest du auf dem Handy und fügst sie deinem Kalender hinzu. Termine mit gleicher Kennung werden beim erneuten Import, je nach Kalender-App, aktualisiert. Das ist nicht überall garantiert, siehe README.</div>
       </div>`;
   }
 
@@ -379,8 +352,6 @@
   function viewSettings() {
     const st = state.settings;
     const dayOpts = (sel) => [1, 2, 3, 4, 5, 6, 0].map(d => `<option value="${d}" ${d === sel ? 'selected' : ''}>${L.WEEKDAYS_LONG[d]}</option>`).join('');
-    const cal = st.calendar;
-    const cfg = C.configured();
     return `<div class="row" style="margin-top:12px"><button class="icon-btn" data-act="backToday" aria-label="Zurück">${icon('back')}</button><h1 style="margin:0 0 0 4px;font-size:28px">Einstellungen</h1></div>
       <h2 class="section">Trainingszeiten</h2>
       ${st.slots.some(x => [1, 2, 4].includes(x.weekday)) ? `<div class="banner">Montag, Dienstag oder Donnerstag ist für Krafttraining eingetragen. Dienstag sollte möglichst frei bleiben.</div>` : ''}
@@ -394,16 +365,10 @@
         <div class="toggle"><span>Pausentimer automatisch starten</span><input type="checkbox" data-field="timerOn" ${st.timerOn ? 'checked' : ''}></div>
         <div class="muted" style="margin-top:8px">Änderungen gelten ab heute. Noch nicht begonnene Termine werden angepasst.</div>
       </div>
-      <h2 class="section">Google Kalender</h2>
+      <h2 class="section">Kalender</h2>
       <div class="card">
-        ${cfg ? '' : `<div class="banner">Noch nicht eingerichtet. Ohne Google-Client-ID funktioniert alles andere wie gewohnt. Die Anleitung steht im README.</div>`}
-        <div class="muted" style="margin-bottom:10px">Status: ${C.isConnected() ? 'verbunden (diese Sitzung)' : 'nicht verbunden'}</div>
-        ${C.isConnected()
-          ? `<button class="btn light" data-act="gdisconnect">Verbindung trennen</button>`
-          : `<button class="btn" ${cfg ? '' : 'disabled'} data-act="gconnect">Mit Google verbinden</button>`}
-        <div class="toggle" style="margin-top:12px"><span>Frei-/Belegt-Zeiten prüfen<br><span class="muted">Zusätzliche Berechtigung, nur Zeiten, keine Titel</span></span><input type="checkbox" data-field="freeBusy" ${cal.freeBusy ? 'checked' : ''}></div>
-        <div class="muted" style="margin-top:10px">Eingetragen wird in den Kalender „Heimtraining“ (Europe/Berlin): Titel, Zeit und Status. Beschwerden und Trainingswerte bleiben in der App.</div>
-        <button class="btn ghost" style="margin-top:12px" data-act="gpreview">Vorschau & eintragen</button>
+        <div class="muted" style="margin-bottom:10px">Trainingstermine als Datei (.ics) herunterladen und in deinen Kalender importieren. Kostenlos, ohne Anmeldung bei Google oder anderen Diensten.</div>
+        <button class="btn" data-act="icsExport">Kalender-Datei herunterladen</button>
       </div>
       <h2 class="section">Daten</h2>
       <div class="card">
@@ -777,8 +742,8 @@
       const def = D.EXERCISES[e.exerciseId];
       return `<div class="check" style="justify-content:space-between"><span>${esc(def.name)}</span><span class="muted">${esc(targetText(e.target || L.currentTarget(state, e.exerciseId), e))}</span></div>`;
     }).join('');
-    const cal = s.calendar && s.calendar.eventId ? `<div class="muted" style="margin-top:8px">Kalendertermin ist angelegt.</div>` : '';
-    const err = s.calendar && s.calendar.error ? `<div class="banner bad" style="margin-top:8px">Kalenderfehler: ${esc(s.calendar.error)}</div>` : '';
+    const cal = '';
+    const err = '';
     openSheet(`<h3>${esc(label(s.type))}</h3>
       <div class="muted" style="margin-bottom:12px">${esc(L.fmtDate(s.date, true))} · ${s.plannedTime ? esc(s.plannedTime) + ' Uhr' : 'Zeit offen'} ${tagFor(s.status)}</div>
       ${list ? `<div class="card" style="padding:6px 14px">${list}</div>` : ''}
@@ -815,7 +780,7 @@
       <div class="toggle"><span>Beschwerden Knie</span><input type="checkbox" id="fKnee" ${painK ? 'checked' : ''}></div>
       <div class="toggle"><span>Beschwerden linke Hand</span><input type="checkbox" id="fHand" ${painH ? 'checked' : ''}></div>
       <div class="field" style="margin-top:12px"><label for="fNotes">Notiz</label><textarea id="fNotes" placeholder="z. B. wie es sich angefühlt hat"></textarea></div>
-      ${s.source !== 'plan' ? `<div class="toggle"><span>Neuen Kalendertermin anlegen<br><span class="muted">Für eine spontan begonnene Einheit</span></span><input type="checkbox" id="fCal"></div>` : ''}
+      ${s.source !== 'plan' ? `<div class="toggle"><span>In die Kalender-Datei aufnehmen<br><span class="muted">Für eine spontan begonnene Einheit</span></span><input type="checkbox" id="fCal"></div>` : ''}
       <button class="btn" data-act="finishSave" data-id="${esc(s.id)}">Training speichern</button>
       <button class="btn ghost" data-act="close" style="margin-top:8px">Zurück</button>`);
     draft._finish = { effort: null, feeling: null };
@@ -954,61 +919,15 @@
   }
   function berlinIsoLocal(date, time) { return L.berlinIso(date, time); }
 
-  async function gConnect() {
-    try {
-      await C.connect(!!state.settings.calendar.freeBusy, false);
-      state.settings.calendar.linked = true; persist();
-      toast('Mit Google verbunden.');
-    } catch (e) { toast(e.message); }
-    render();
-  }
-  // Stille Wiederverbindung beim Start, nur wenn der Nutzer die Verbindung schon einmal bestätigt hat
-  async function gRestore() {
-    const cal = state.settings.calendar;
-    if (!cal.linked || !C.configured() || C.isConnected()) return;
-    try { await C.connect(!!cal.freeBusy, true); render(); } catch (e) { /* bleibt getrennt, ohne Fehlermeldung */ }
-  }
-
-  function gPreview() {
-    const ops = L.planCalendarOps(state);
-    const errs = state.sessions.filter(s => s.calendar && s.calendar.error);
-    const list = ops.length ? ops.map(o => `<div class="check"><span class="ico" style="width:24px;height:24px;display:inline-grid;place-items:center">${icon(o.op === 'delete' ? 'alert' : 'cal')}</span><span>${esc(o.label)}</span></div>`).join('') : '<div class="muted">Nichts zu tun. Alles ist synchron.</div>';
-    const errList = errs.length ? `<h2 class="section">Mit Fehler</h2>` + errs.map(s => `<div class="note-box"><strong>${esc(label(s.type))}</strong> · ${esc(L.fmtDate(s.date, false))}<div class="muted">${esc(s.calendar.error)}</div></div>`).join('') : '';
-    openSheet(`<h3>Vorschau Google Kalender</h3>
-      <div class="muted" style="margin-bottom:10px">Diese Termine werden eingetragen oder aktualisiert. Nur nach deiner Bestätigung.</div>
-      ${list}${errList}
-      ${ops.length || errs.length ? `<button class="btn" data-act="gSync">Jetzt eintragen</button>` : ''}
-      <button class="btn ghost" data-act="close" style="margin-top:8px">Schließen</button>`);
-  }
-
-  async function gSync() {
-    if (!C.isConnected()) { toast('Bitte zuerst mit Google verbinden.'); return; }
-    const ops = L.planCalendarOps(state);
-    const cal = state.settings.calendar;
-    try {
-      cal.calendarId = await C.ensureCalendar(cal.calendarId);
-    } catch (e) { toast('Kalender konnte nicht vorbereitet werden: ' + e.message); return; }
-    persist();
-    const res = await C.runOps(ops, cal.calendarId, applyOpResult);
-    persist(); closeSheet(); render();
-    toast(res.failed.length ? `${res.ok} eingetragen, ${res.failed.length} mit Fehler. Die App behält den Stand.` : `${res.ok} Vorgänge eingetragen.`);
-  }
-  function applyOpResult(sid, patch) {
-    const s = find(sid);
-    if (!s) return;
-    if (patch.error) { s.calendar = { ...(s.calendar || {}), error: patch.error }; return; }
-    if (patch.eventId === null) { s.calendar = null; return; }
-    s.calendar = { eventId: patch.eventId, hash: patch.hash, calendarId: patch.calendarId, syncedAt: nowIso(), error: null };
-  }
-
-  async function refreshBusy() {
-    if (!state.settings.calendar.freeBusy || !C.isConnected()) { toast('Belegt-Zeiten brauchen eine Verbindung mit Frei-/Belegt-Berechtigung.'); return; }
-    const ws = ui.weekStart || L.mondayOf(today());
-    try {
-      busy = await C.busyBlocks(berlinIsoLocal(ws, '00:00') , berlinIsoLocal(L.addDays(ws, 7), '00:00'));
-      busyWeek = ws;
-      render();
-    } catch (e) { toast('Belegt-Zeiten konnten nicht geladen werden: ' + e.message); }
+  function icsExport() {
+    const text = L.icsCalendar(state, nowIso());
+    const blob = new Blob([text], { type: 'text/calendar;charset=utf-8' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `trainingszeit-${today()}.ics`;
+    document.body.appendChild(a); a.click();
+    setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1500);
+    toast(`${L.icsEvents(state).length} Termine exportiert.`);
   }
 
   function exportFile() {
@@ -1164,14 +1083,10 @@
         L.undoAdjustment(state, id); persist(); toast('Anpassung zurückgenommen.'); render(); return;
       }
       case 'setEffort': { const s = find(id); s.effort = Number(el.dataset.v); persist(); detailSheet(id); render(); return; }
-      case 'week': { ui.weekStart = L.addDays(ui.weekStart || L.mondayOf(today()), Number(el.dataset.d)); busy = null; render(); return; }
-      case 'busy': refreshBusy(); return;
+      case 'week': { ui.weekStart = L.addDays(ui.weekStart || L.mondayOf(today()), Number(el.dataset.d)); render(); return; }
       case 'histTab': ui.histTab = el.dataset.tab; render(); return;
       case 'rest': state.settings.restSec = Number(el.dataset.v); persist(); render(); return;
-      case 'gconnect': gConnect(); return;
-      case 'gdisconnect': C.disconnect(); state.settings.calendar.linked = false; persist(); toast('Verbindung getrennt. Bereits eingetragene Termine bleiben im Kalender.'); render(); return;
-      case 'gpreview': gPreview(); return;
-      case 'gSync': gSync(); return;
+      case 'icsExport': icsExport(); return;
       case 'export': exportFile(); return;
       case 'importConfirm': {
         if (!pendingImport) return;
@@ -1234,12 +1149,6 @@
     else if (f === 'cardioDay') { st.cardio.weekday = Number(el.value); planChanged(); }
     else if (f === 'cardioOn') { st.cardio.optional = el.checked; planChanged(); }
     else if (f === 'timerOn') { st.timerOn = el.checked; persist(); render(); }
-    else if (f === 'freeBusy') {
-      st.calendar.freeBusy = el.checked;
-      persist();
-      if (el.checked && C.isConnected()) { toast('Für Frei-/Belegt-Zeiten bitte einmal erneut verbinden.'); }
-      render();
-    }
   });
 
   function planChanged() {
@@ -1281,12 +1190,11 @@
     if (!ui.route) ui.route = 'today';
     persist();
     render();
-    gRestore();
     window.addEventListener('visibilitychange', () => { if (!document.hidden) render(); });
     if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('sw.js').catch(() => {});
   }
 
   document.addEventListener('DOMContentLoaded', init);
   if (document.readyState !== 'loading') init();
-  void lastOk; void busyWeek; void draft;
+  void lastOk; void draft;
 })();

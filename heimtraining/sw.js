@@ -1,6 +1,6 @@
 // Offline-Hülle für Trainingszeit. Die Trainingsdaten liegen im Browser (localStorage), nicht im Cache.
-const CACHE = 'trainingszeit-v1';
-const SHELL = ['./', './index.html', './styles.css', './config.js', './data.js', './logic.js', './calendar.js', './app.js', './manifest.webmanifest', './icons/icon.svg'];
+const CACHE = 'trainingszeit-v2';
+const SHELL = ['./', './index.html', './styles.css', './data.js', './logic.js', './app.js', './manifest.webmanifest', './icons/icon.svg', './fonts/dm-sans-latin-400-normal.woff2', './fonts/dm-sans-latin-500-normal.woff2', './fonts/dm-sans-latin-700-normal.woff2', './fonts/dm-sans-latin-800-normal.woff2'];
 
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(SHELL)).then(() => self.skipWaiting()));
@@ -10,7 +10,6 @@ self.addEventListener('activate', e => {
 });
 self.addEventListener('fetch', e => {
   const url = new URL(e.request.url);
-  // Google-Anmeldung und API nie zwischenspeichern
   if (e.request.method !== 'GET' || url.origin !== location.origin) return;
   e.respondWith(
     fetch(e.request).then(r => {

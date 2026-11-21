@@ -260,38 +260,42 @@ test('Heute / Start: Termin offen zählt nicht als Kalenderereignis', () => {
   assert.equal(L.eventBody(cardio), null);
 });
 
-test('Kalender: stabile ID, Verschieben aktualisiert denselben Termin, Abschluss ebenfalls', () => {
+test('ICS: gleiche UID beim Verschieben und beim Abschluss, Zeiten in UTC', () => {
   const s = fresh();
   L.ensurePlan(s, TODAY, 28);
   const target = s.sessions.find(x => x.date === '2026-11-25' && x.type === 'B');
-  assert.ok(target);
-  const ops1 = L.planCalendarOps(s);
-  const create = ops1.find(o => o.sessionId === target.id);
-  assert.equal(create.op, 'create');
-  // Simulation: Termin wurde angelegt
-  target.calendar = { eventId: create.body.id, hash: create.hash };
-  // Verschieben auf 17:00
-  target.plannedTime = '17:00';
-  const ops2 = L.planCalendarOps(s);
-  const upd = ops2.find(o => o.sessionId === target.id);
-  assert.equal(upd.op, 'update');
-  assert.equal(upd.eventId, create.body.id, 'gleiche Google-ID');
-  assert.equal(upd.body.start.dateTime, '2026-11-25T17:00:00');
-  // Abschluss
-  target.calendar = { eventId: upd.eventId, hash: upd.hash };
+  const uidOf = text => (text.match(/UID:(hts\w+)@trainingszeit/g) || []).filter(u => u.includes(L.calendarEventId(target.id)));
+  const ics1 = L.icsCalendar(s, NOW);
+  assert.equal(uidOf(ics1).length, 1, 'einmal im Export');
+  assert.ok(ics1.includes('DTSTART:20261125T150000Z'), '16:00 Berlin = 15:00 UTC');
+  // Verschieben auf 17:15
+  target.plannedTime = '17:15';
+  const ics2 = L.icsCalendar(s, NOW);
+  assert.equal(uidOf(ics2).length, 1, 'gleiche UID, kein zweiter Eintrag');
+  assert.ok(ics2.includes('DTSTART:20261125T161500Z'), 'neue Zeit 17:15 Berlin = 16:15 UTC');
+  // Abschluss mit Ist-Zeit
   L.startSession(s, target, '2026-11-25T16:02:00+01:00', null);
   target.exercises.forEach((ex, e) => ex.sets.forEach((_, i) => L.logSet(target, e, i, { reps: 10, weight: 2.5 })));
   L.completeSession(target, { endedAt: '2026-11-25T16:44:00+01:00' });
-  const ops3 = L.planCalendarOps(s);
-  const fin = ops3.find(o => o.sessionId === target.id);
-  assert.equal(fin.op, 'update');
-  assert.equal(fin.eventId, create.body.id, 'Abschluss aktualisiert denselben Eintrag');
-  assert.ok(fin.body.summary.startsWith('✓ '));
-  assert.equal(fin.body.start.dateTime, '2026-11-25T16:02:00', 'Berlin-Zeit der echten Startzeit (UTC+1 im November)');
-  assert.equal(fin.body.end.dateTime, '2026-11-25T16:44:00');
-  // Ohne Änderung kein weiterer Vorgang
-  target.calendar = { eventId: fin.eventId, hash: fin.hash };
-  assert.equal(L.planCalendarOps(s).find(o => o.sessionId === target.id), undefined);
+  const ics3 = L.icsCalendar(s, NOW);
+  assert.equal(uidOf(ics3).length, 1, 'Abschluss ändert denselben Eintrag');
+  assert.ok(ics3.includes('SUMMARY:✓ Krafttraining B'), 'Titel mit ✓');
+  assert.ok(ics3.includes('DTSTART:20261125T150200Z') && ics3.includes('DTEND:20261125T154400Z'), 'Ist-Zeiten 16:02–16:44 Berlin');
+  // Ausgelassen: nicht mehr im Export
+  target.status = 'ausgelassen';
+  assert.equal(uidOf(L.icsCalendar(s, NOW)).length, 0);
+});
+
+test('ICS: spontane Einheit nur mit ausdrücklicher Wahl, Umlaute und Kommas werden escaped', () => {
+  const s = fresh();
+  const sp = L.createUnplanned(s, '2026-11-24', 'A', 'spontan');
+  sp.startedAt = '2026-11-24T15:00:00.000Z';
+  assert.ok(!L.icsCalendar(s, NOW).includes('UID:' + L.calendarEventId(sp.id)));
+  sp.calendarOptIn = true;
+  const text = L.icsCalendar(s, NOW);
+  assert.ok(text.includes('UID:' + L.calendarEventId(sp.id) + '@trainingszeit'));
+  assert.ok(text.includes('BEGIN:VCALENDAR') && text.trimEnd().endsWith('END:VCALENDAR'));
+  assert.equal(L.icsCalendar(s, NOW).split('\r\n').filter(l => l.length > 75 && !l.startsWith(' ')).length, 0, 'Zeilen gefaltet');
 });
 
 test('Kalender: Beschreibung enthält keine Beschwerden oder Details', () => {

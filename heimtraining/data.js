@@ -151,8 +151,7 @@
     ],
     cardio: { weekday: 0, time: null, label: 'Ausdauer (optional)', optional: true },
     restSec: 75,
-    timerOn: true,
-    calendar: { enabled: false, calendarId: null, freeBusy: false, pendingOps: [] }
+    timerOn: true
   };
 
   const api = { EXERCISES, TEMPLATES, EQUIPMENT, SEED_SESSIONS, SETTINGS_DEFAULT };

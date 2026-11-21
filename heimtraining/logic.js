@@ -471,7 +471,6 @@
     return `${t.getUTCFullYear()}-${pad(t.getUTCMonth() + 1)}-${pad(t.getUTCDate())}T${pad(t.getUTCHours())}:${pad(t.getUTCMinutes())}:00`;
   }
   function calendarEventId(sessionIdStr) { return 'ht' + sessionIdStr.toLowerCase().replace(/[^a-v0-9]/g, ''); }
-  function hash(str) { let h = 5381; for (let i = 0; i < str.length; i++) h = ((h << 5) + h + str.charCodeAt(i)) | 0; return (h >>> 0).toString(16); }
   const KIND_LABEL = { A: 'Krafttraining A', B: 'Krafttraining B', cardio: 'Ausdauer (optional)' };
 
   function eventBody(session) {
@@ -498,23 +497,49 @@
     };
   }
 
-  // Ops: create / update / delete. Nur geänderte Einträge (über Hash) werden angefasst.
-  function planCalendarOps(state) {
-    const ops = [];
+  // ---------- Kalender-Export als .ics (kostenlos, ohne Google-Anbindung) ----------
+  // Jede Einheit bekommt eine feste UID. Wird dieselbe Datei erneut importiert,
+  // erkennt ein Kalender-Programm den Termin anhand der UID.
+  function icsStamp(iso) { return new Date(iso).toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, ''); }
+  function icsEscape(t) { return String(t).replace(/\\/g, '\\\\').replace(/;/g, '\;').replace(/,/g, '\\,').replace(/\r?\n/g, '\\n'); }
+  function icsFold(line) {
+    // Zeilen höchstens 60 Zeichen lang halten (Mehrbyte-Zeichen sicher innerhalb 75 Oktette)
+    const out = []; let rest = line;
+    while (rest.length > 60) { out.push(rest.slice(0, 60)); rest = ' ' + rest.slice(60); }
+    out.push(rest);
+    return out.join('\r\n');
+  }
+  // Zeitraum einer Einheit als UTC-Zeitpunkte
+  function sessionSpanIso(s) {
+    const start = s.startedAt || (s.plannedTime ? berlinIso(s.date, s.plannedTime) : null);
+    if (!start) return null;
+    const dur = s.type === 'cardio' ? 32 : 40;
+    const end = s.endedAt || new Date(Date.parse(start) + dur * 60000).toISOString();
+    return { start, end };
+  }
+  // Aufgenommen werden geplante Einheiten und spontane/nachgetragene nur, wenn du sie ausdrücklich wählst.
+  // Ausgelassene Einheiten fehlen in der Datei; sie aus einem früheren Import bitte von Hand löschen.
+  function icsEvents(state) {
+    const out = [];
     for (const s of state.sessions) {
-      const cal = s.calendar || {};
-      if (s.status === 'ausgelassen' && cal.eventId) { ops.push({ op: 'delete', sessionId: s.id, eventId: cal.eventId, label: 'Termin entfernen (ausgelassen)' }); continue; }
+      if (s.status === 'ausgelassen') continue;
+      if (!(s.source === 'plan' || s.calendarOptIn === true)) continue;
       const body = eventBody(s);
-      if (!body) continue;
-      const h = hash(JSON.stringify(body));
-      // Neue Termine nur für geplante Einheiten oder wenn ich es bei einer spontanen Einheit ausdrücklich wähle.
-      // Importierte Vergangenheit wird nie automatisch eingetragen.
-      const mayCreate = (s.source === 'plan' && s.status !== 'ausgelassen') || s.calendarOptIn === true;
-      if (!cal.eventId && !mayCreate) continue;
-      if (!cal.eventId) ops.push({ op: 'create', sessionId: s.id, body, hash: h, label: `Neu: ${body.summary}` });
-      else if (cal.hash !== h) ops.push({ op: 'update', sessionId: s.id, eventId: cal.eventId, body, hash: h, label: `Aktualisieren: ${body.summary}` });
+      const span = sessionSpanIso(s);
+      if (!body || !span) continue;
+      out.push({ uid: `${body.id}@trainingszeit`, summary: body.summary, description: body.description, start: span.start, end: span.end });
     }
-    return ops;
+    return out;
+  }
+  function icsCalendar(state, nowIso) {
+    const stamp = icsStamp(nowIso);
+    const lines = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//Trainingszeit//Heimtraining//DE', 'CALSCALE:GREGORIAN', 'METHOD:PUBLISH', 'X-WR-CALNAME:Heimtraining'];
+    for (const e of icsEvents(state)) {
+      lines.push('BEGIN:VEVENT', `UID:${e.uid}`, `DTSTAMP:${stamp}`, `DTSTART:${icsStamp(e.start)}`, `DTEND:${icsStamp(e.end)}`,
+        `SUMMARY:${icsEscape(e.summary)}`, `DESCRIPTION:${icsEscape(e.description)}`, 'STATUS:CONFIRMED', 'TRANSP:OPAQUE', 'END:VEVENT');
+    }
+    lines.push('END:VCALENDAR');
+    return lines.map(icsFold).join('\r\n') + '\r\n';
   }
 
   // ---------- Import / Export ----------
@@ -599,7 +624,7 @@
     sessionId, newSession, nextStrengthType, lastCompletedStrength, ensurePlan,
     startSession, currentPosition, logSet, skipSet, reopenSet, swapExercise, skipExercise, completeSession, updateExerciseStatus,
     adjustFromSession, acceptProposal, undoAdjustment, exerciseHistory,
-    calendarEventId, eventBody, planCalendarOps, hash,
+    calendarEventId, eventBody, icsCalendar, icsEvents,
     exportPayload, validateImport, importPayload, initialState, templateSlots, KIND_LABEL,
     planSlots, hasPreviousData, pruneFuturePlanned, berlinIso,
     reassignStrengthTypes, createUnplanned, planSnapshot, diffPlans
