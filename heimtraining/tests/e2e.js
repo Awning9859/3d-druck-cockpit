@@ -49,8 +49,14 @@ const shots = process.env.SHOTS || path.join(process.env.TMPDIR || '/tmp', 'ht-s
     check('Satz-Ansicht geöffnet', true);
     await page.screenshot({ path: path.join(shots, '04-satz.png') });
     // Zwei Sätze erledigen
-    await page.click('[data-act="done"]');
-    await page.click('[data-act="done"]');
+    // Bis die erste Übung abgeschlossen ist (Aufwärmen, dann bekannte Übung mit Reserve-Frage)
+    for (let i = 0; i < 12; i++) {
+      if (await page.$('text=Wie viele saubere Wiederholungen')) break;
+      const d = await page.$('[data-act="done"]');
+      if (!d) break;
+      await d.click();
+      await page.waitForTimeout(80);
+    }
     // Erste Übung ist erledigt: Fortschrittsbalken zeigt sie, die Rückfrage zur Reserve erscheint
     const progDone = await page.$$eval('.progress span.done', els => els.length);
     check('Übung nach erledigten Sätzen als erledigt markiert', progDone >= 1, 'erledigte Übungen: ' + progDone);

@@ -256,8 +256,17 @@
     { id: 's-2026-11-25-cardio', date: '2026-11-25', type: 'cardio', status: 'abgeschlossen', startedAt: '2026-11-25T17:37:00+01:00', endedAt: null,
       durationMin: 32, effort: null, feeling: null, pain: { knee: false, leftHand: false }, source: 'import', plannedTime: '17:37',
       notes: 'Laufband gestartet 17:37 Uhr, 32 Min. geplant. Ende nicht bestätigt.', exercises: [] },
-    { id: 's-2026-11-21', date: '2026-11-21', type: 'A', status: 'begonnen', startedAt: '2026-11-21T13:58:00+01:00', endedAt: null,
-      effort: null, feeling: null, pain: { knee: false, leftHand: false }, notes: 'Abschluss und Sätze noch offen.', exercises: [], source: 'import' }
+    { id: 's-2026-11-21', date: '2026-11-21', type: 'A', status: 'abgeschlossen', startedAt: '2026-11-21T13:58:00+01:00', endedAt: '2026-11-21T14:40:00+01:00',
+      effort: 3, effortNote: 'Gesamtanstrengung 3–4/10', feeling: null, pain: { knee: false, leftHand: false }, source: 'import', plannedTime: null,
+      notes: 'Aufwärmen 7:33 Min. (gemeldet). Rückmeldung zu Knie, Hand und Reserve war noch offen. Aus dem Kalendereintrag übernommen.',
+      exercises: [
+        { slotId: 'Kniebeuge', exerciseId: 'goblet_squat', effort: null, technique: null, sets: [ s(8, 8), s(8, 8) ] },
+        { slotId: 'Hüfte', exerciseId: 'kb_deadlift', effort: null, technique: null, sets: [ s(10, 8), s(10, 8) ] },
+        { slotId: 'Rücken', exerciseId: 'row_bent', effort: null, technique: null, sets: [ s(12, 2.5), s(14, 2.5), s(14, 2.5) ] },
+        { slotId: 'Drücken', exerciseId: 'press_floor', effort: null, technique: null, sets: [ s(12, 2.5), s(12, 2.5), s(12, 2.5) ] },
+        { slotId: 'Po & Beinrückseite', exerciseId: 'bridge_single', effort: null, technique: null, sets: [ s(10, null), s(10, null) ] },
+        { slotId: 'Rumpf', exerciseId: 'plank_forearm', effort: null, technique: null, sets: [ s(null, null), s(null, null) ] }
+      ] }
   ];
 
   function s(reps, weight) { return { reps, weight, status: 'erledigt', rir: null }; }

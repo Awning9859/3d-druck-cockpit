@@ -38,8 +38,8 @@ test('Startdaten: 18.11. ist vollständig, 21.11. ist offen', () => {
   assert.equal(row.substituted, true, 'Rudern war Alternative in B');
   assert.equal(d18.exercises.find(e => e.exerciseId === 'dead_bug').sets.length, 4, 'Dead Bug 2×10 je Seite = 4 Sätze');
   const d21 = byId(s, 's-2026-11-21');
-  assert.equal(d21.status, 'begonnen');
-  assert.equal(d21.endedAt, null);
+  assert.equal(d21.status, 'abgeschlossen', 'aus dem Kalendereintrag übernommen');
+  assert.equal(d21.exercises.length, 6);
 });
 
 test('Anker: nach B vom 18.11. folgt A; offene A-Einheit verschiebt den Rest', () => {
