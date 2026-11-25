@@ -44,7 +44,7 @@ test('Startdaten: 18.11. ist vollständig, 21.11. ist offen', () => {
 
 test('Anker: nach B vom 18.11. folgt A; offene A-Einheit verschiebt den Rest', () => {
   const s = fresh();
-  assert.equal(L.nextStrengthType(s.sessions), 'B', 'begonnene A vom 21.11. zählt für die Planung');
+  assert.equal(L.nextStrengthType(s.sessions), 'A', 'nach B vom 25.11. folgt A');
   const onlyDone = s.sessions.filter(x => x.id !== 's-2026-11-21');
   assert.equal(L.nextStrengthType(onlyDone), 'A');
 });
@@ -60,7 +60,7 @@ test('Wochenplan: Mittwoch und Freitag ab 16 Uhr, Wochenende nur Ausdauer option
     assert.equal(t, '16:00');
   }
   assert.ok(strength.length >= 8, 'mindestens 8 Krafteinheiten in 4 Wochen');
-  const cardio = s.sessions.filter(x => x.type === 'cardio' && x.date >= TODAY);
+  const cardio = s.sessions.filter(x => x.type === 'cardio' && x.date >= TODAY && x.source === 'plan');
   assert.ok(cardio.length >= 3);
   assert.ok(cardio.every(c => L.weekdayOf(c.date) === 0 && c.plannedTime === null), 'Ausdauer nur sonntags, Zeit offen');
 });
@@ -70,7 +70,7 @@ test('Wochenplan: A und B wechseln, offene A-Einheit bleibt erhalten', () => {
   L.ensurePlan(s, TODAY, 28);
   const seq = s.sessions.filter(x => x.date > TODAY && (x.type === 'A' || x.type === 'B') && x.source === 'plan').map(x => x.type);
   assert.equal(strengthOn(s, '2026-11-21').type, 'A');
-  assert.equal(seq[0], 'B');
+  assert.equal(seq[0], 'A', 'Plan-Einheit 27.11. ist A');
   for (let i = 1; i < seq.length; i++) assert.notEqual(seq[i], seq[i - 1]);
   // Idempotent: zweiter Lauf erzeugt nichts Neues
   const n = s.sessions.length;
@@ -263,24 +263,24 @@ test('Heute / Start: Termin offen zählt nicht als Kalenderereignis', () => {
 test('ICS: gleiche UID beim Verschieben und beim Abschluss, Zeiten in UTC', () => {
   const s = fresh();
   L.ensurePlan(s, TODAY, 28);
-  const target = s.sessions.find(x => x.date === '2026-11-25' && x.type === 'B');
+  const target = s.sessions.find(x => x.date === '2026-12-02' && x.type === 'B');
   const uidOf = text => (text.match(/UID:(hts\w+)@trainingszeit/g) || []).filter(u => u.includes(L.calendarEventId(target.id)));
   const ics1 = L.icsCalendar(s, NOW);
   assert.equal(uidOf(ics1).length, 1, 'einmal im Export');
-  assert.ok(ics1.includes('DTSTART:20261125T150000Z'), '16:00 Berlin = 15:00 UTC');
+  assert.ok(ics1.includes('DTSTART:20261202T150000Z'), '16:00 Berlin = 15:00 UTC');
   // Verschieben auf 17:15
   target.plannedTime = '17:15';
   const ics2 = L.icsCalendar(s, NOW);
   assert.equal(uidOf(ics2).length, 1, 'gleiche UID, kein zweiter Eintrag');
-  assert.ok(ics2.includes('DTSTART:20261125T161500Z'), 'neue Zeit 17:15 Berlin = 16:15 UTC');
+  assert.ok(ics2.includes('DTSTART:20261202T161500Z'), 'neue Zeit 17:15 Berlin = 16:15 UTC');
   // Abschluss mit Ist-Zeit
-  L.startSession(s, target, '2026-11-25T16:02:00+01:00', null);
+  L.startSession(s, target, '2026-12-02T16:02:00+01:00', null);
   target.exercises.forEach((ex, e) => ex.sets.forEach((_, i) => L.logSet(target, e, i, { reps: 10, weight: 2.5 })));
-  L.completeSession(target, { endedAt: '2026-11-25T16:44:00+01:00' });
+  L.completeSession(target, { endedAt: '2026-12-02T16:44:00+01:00' });
   const ics3 = L.icsCalendar(s, NOW);
   assert.equal(uidOf(ics3).length, 1, 'Abschluss ändert denselben Eintrag');
   assert.ok(ics3.includes('SUMMARY:✓ Krafttraining B'), 'Titel mit ✓');
-  assert.ok(ics3.includes('DTSTART:20261125T150200Z') && ics3.includes('DTEND:20261125T154400Z'), 'Ist-Zeiten 16:02–16:44 Berlin');
+  assert.ok(ics3.includes('DTSTART:20261202T150200Z') && ics3.includes('DTEND:20261202T154400Z'), 'Ist-Zeiten 16:02–16:44 Berlin');
   // Ausgelassen: nicht mehr im Export
   target.status = 'ausgelassen';
   assert.equal(uidOf(L.icsCalendar(s, NOW)).length, 0);
@@ -375,4 +375,38 @@ test('Plan: keine Krafteinheit am Montag, Dienstag oder Donnerstag mit Standardz
   const s = fresh();
   L.ensurePlan(s, TODAY, 28);
   assert.ok(!s.sessions.some(x => (x.type === 'A' || x.type === 'B') && x.source === 'plan' && [1, 2, 4].includes(L.weekdayOf(x.date))));
+});
+
+test('Plan: sieben feste Einheiten mit Nummer und Termin', () => {
+  const s = fresh();
+  const plan = s.sessions.filter(x => x.planN);
+  assert.equal(plan.length, 7);
+  assert.deepEqual(plan.map(x => x.date), ['2026-11-27', '2026-12-02', '2026-12-04', '2026-12-09', '2026-12-11', '2026-12-16', '2026-12-18']);
+  assert.deepEqual(plan.map(x => x.type), ['A', 'B', 'A', 'B', 'A', 'B', 'A']);
+  assert.ok(plan.every(x => x.plannedTime === '16:00'));
+});
+
+test('Plan: Vorgaben der Einheit 1 (Goblet Squat 3 × 8–10, 8 kg, Aufwärmen zuerst)', () => {
+  const s = fresh();
+  const ex = L.buildExercises(s, 'A', 1);
+  assert.equal(ex[0].exerciseId, 'warmup');
+  assert.equal(ex[0].target.kind, 'check');
+  const gs = ex.find(e => e.exerciseId === 'goblet_squat');
+  assert.equal(gs.target.sets, 3);
+  assert.equal(gs.target.repMin, 8);
+  assert.equal(gs.target.repMax, 10);
+  assert.equal(gs.target.weight, 8);
+  assert.equal(gs.sets.length, 3);
+});
+
+test('Plan: Plan-Einheit ändert ihre Vorgaben nie automatisch, nur Vorschläge', () => {
+  const s = fresh();
+  const sess = s.sessions.find(x => x.planN === 1);
+  L.startSession(s, sess, NOW, null);
+  sess.exercises.forEach((e, i) => e.sets.forEach((x, j) => L.logSet(sess, i, j, { reps: e.target.repMax || 10, weight: x.weight, holdSec: e.target.holdMax || null })));
+  L.completeSession(sess, { endedAt: '2026-11-27T16:50:00+01:00' });
+  const res = L.adjustFromSession(s, sess, NOW);
+  assert.deepEqual(res.changes, []);
+  assert.deepEqual(s.targets, {}, 'keine Ziele verändert');
+  assert.ok(res.suggestions.length > 0, 'Vorschlag für das obere Ende');
 });

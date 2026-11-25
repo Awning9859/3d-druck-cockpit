@@ -3,6 +3,23 @@
   'use strict';
 
   const EXERCISES = {
+    warmup: {
+      name: 'Aufwärmen: Laufband und Mobilisation', group: 'Aufwärmen', kind: 'check', equipment: ['laufband', 'matte'],
+      cues: ['Laufband 0–2 Min. bei 3,0 km/h, 2–4 Min. bei 4,0 km/h, 4–5 Min. bei 4,5–5,0 km/h, Steigung 3 %.',
+             'Danach 8 Kniebeugen und 8 Hüftbeugen ohne Gewicht.'],
+      easier: null, stages: []
+    },
+    row_kb_double: {
+      name: 'Beidhändiges Kettlebell-Rudern (8 kg)', group: 'Rücken', kind: 'reps',
+      equipment: ['kettlebell'],
+      cues: ['Kettlebell am Horn mit beiden Händen, Oberkörper vorgebeugt, Rücken gerade.', 'Zum Bauch rudern, Schulterblätter zusammenziehen, langsam absenken.'],
+      easier: 'row_bent', stages: []
+    },
+    kb_swing: {
+      name: 'Kettlebell-Swing (8 kg)', group: 'Hüfte', kind: 'reps', equipment: ['kettlebell'],
+      cues: ['Die Kraft kommt aus der Hüfte, die Arme bleiben locker wie Seile.', 'Hüfte nach hinten, Kettlebell zwischen den Beinen, dann die Hüfte nach vorn schnappen lassen.', 'Rücken bleibt gerade, ausatmen beim Hochschwingen.'],
+      easier: 'kb_deadlift', stages: []
+    },
     goblet_squat: {
       name: 'Goblet Squat', group: 'Kniebeuge', kind: 'reps',
       equipment: ['kettlebell'], knee: true, grip: true,
@@ -84,6 +101,82 @@
     }
   };
 
+  // Trainingsplan: sieben Einheiten vom 27.11. bis 18.12. Die Werte sind die Vorgaben je Einheit.
+  // min/max = Wiederholungen, hmin/hmax = Haltezeit in Sekunden, weight in kg (Kurzhantel je Hand).
+  const PLAN = [
+    { n: 1, date: '2026-11-27', type: 'A', phase: 'Basis', ex: [
+      { id: 'warmup', sets: 1 },
+      { id: 'goblet_squat', sets: 3, min: 8, max: 10, weight: 8 },
+      { id: 'kb_deadlift', sets: 3, min: 10, max: 12, weight: 8 },
+      { id: 'row_kb_double', sets: 3, min: 10, max: 12, weight: 8 },
+      { id: 'press_floor', sets: 3, min: 12, max: 15, weight: 2.5, tempo: '3 s absenken' },
+      { id: 'shoulder_press', sets: 3, min: 10, max: 12, weight: 2.5 },
+      { id: 'plank_forearm', sets: 3, hmin: 30, hmax: 30 },
+      { id: 'dead_bug', sets: 2, min: 10, max: 10, perSide: true }
+    ] },
+    { n: 2, date: '2026-12-02', type: 'B', phase: 'Basis', ex: [
+      { id: 'warmup', sets: 1 },
+      { id: 'squat_dumbbell', sets: 3, min: 12, max: 12, weight: 2.5, tempo: '3 s absenken' },
+      { id: 'kb_deadlift', sets: 3, min: 10, max: 12, weight: 8 },
+      { id: 'bridge_single', sets: 2, min: 10, max: 10, weight: 8, perSide: true, note: 'Kettlebell auf der Hüfte' },
+      { id: 'row_bent', sets: 3, min: 12, max: 12, weight: 2.5 },
+      { id: 'shoulder_press', sets: 3, min: 12, max: 12, weight: 1.5 },
+      { id: 'hamstring_ball', sets: 2, min: 10, max: 10 },
+      { id: 'dead_bug', sets: 2, min: 10, max: 10, perSide: true }
+    ] },
+    { n: 3, date: '2026-12-04', type: 'A', phase: 'Steigerung', ex: [
+      { id: 'warmup', sets: 1 },
+      { id: 'goblet_squat', sets: 3, min: 10, max: 12, weight: 8 },
+      { id: 'kb_deadlift', sets: 3, min: 12, max: 15, weight: 8 },
+      { id: 'row_kb_double', sets: 3, min: 12, max: 15, weight: 8 },
+      { id: 'press_floor', sets: 3, min: 12, max: 15, weight: 2.5 },
+      { id: 'shoulder_press', sets: 3, min: 10, max: 12, weight: 2.5 },
+      { id: 'plank_forearm', sets: 3, hmin: 35, hmax: 35 },
+      { id: 'dead_bug', sets: 2, min: 10, max: 10, perSide: true }
+    ] },
+    { n: 4, date: '2026-12-09', type: 'B', phase: 'Steigerung', ex: [
+      { id: 'warmup', sets: 1 },
+      { id: 'squat_dumbbell', sets: 3, min: 12, max: 15, weight: 2.5, tempo: '3 s absenken' },
+      { id: 'kb_deadlift', sets: 3, min: 12, max: 15, weight: 8, tempo: '3-1-1' },
+      { id: 'bridge_single', sets: 2, min: 12, max: 12, weight: 8, perSide: true, note: 'Kettlebell auf der Hüfte' },
+      { id: 'row_bent', sets: 3, min: 12, max: 15, weight: 2.5 },
+      { id: 'shoulder_press', sets: 3, min: 12, max: 15, weight: 1.5 },
+      { id: 'hamstring_ball', sets: 2, min: 10, max: 12 },
+      { id: 'dead_bug', sets: 2, min: 10, max: 10, perSide: true }
+    ] },
+    { n: 5, date: '2026-12-11', type: 'A', phase: 'Tempo', ex: [
+      { id: 'warmup', sets: 1 },
+      { id: 'goblet_squat', sets: 3, min: 12, max: 12, weight: 8, tempo: '2 s unten halten' },
+      { id: 'kb_deadlift', sets: 3, min: 15, max: 15, weight: 8, tempo: '3-1-1' },
+      { id: 'row_kb_double', sets: 3, min: 15, max: 15, weight: 8, tempo: '2 s oben halten' },
+      { id: 'press_floor', sets: 3, min: 15, max: 15, weight: 2.5, tempo: '3 s runter, 1 s unten' },
+      { id: 'shoulder_press', sets: 3, min: 12, max: 12, weight: 2.5 },
+      { id: 'plank_forearm', sets: 3, hmin: 40, hmax: 40 },
+      { id: 'dead_bug', sets: 2, min: 10, max: 10, perSide: true }
+    ] },
+    { n: 6, date: '2026-12-16', type: 'B', phase: 'Tempo und Schwung', ex: [
+      { id: 'warmup', sets: 1 },
+      { id: 'squat_dumbbell', sets: 3, min: 15, max: 15, weight: 2.5, tempo: '3 s absenken' },
+      { id: 'kb_deadlift', sets: 3, min: 15, max: 15, weight: 8, tempo: '3-1-1' },
+      { id: 'kb_swing', sets: 2, min: 10, max: 10, weight: 8 },
+      { id: 'bridge_single', sets: 2, min: 12, max: 12, weight: 8, perSide: true, note: 'Kettlebell auf der Hüfte' },
+      { id: 'row_bent', sets: 3, min: 15, max: 15, weight: 2.5, tempo: '2 s oben halten' },
+      { id: 'shoulder_press', sets: 3, min: 15, max: 15, weight: 1.5 },
+      { id: 'hamstring_ball', sets: 2, min: 12, max: 12 },
+      { id: 'dead_bug', sets: 2, min: 10, max: 10, perSide: true }
+    ] },
+    { n: 7, date: '2026-12-18', type: 'A', phase: 'Abschluss und Messung', ex: [
+      { id: 'warmup', sets: 1 },
+      { id: 'goblet_squat', sets: 3, min: 12, max: 12, weight: 8, tempo: '2 s unten halten' },
+      { id: 'kb_deadlift', sets: 3, min: 15, max: 15, weight: 8, tempo: '3-1-1' },
+      { id: 'row_kb_double', sets: 3, min: 15, max: 15, weight: 8, tempo: '2 s oben halten' },
+      { id: 'press_floor', sets: 3, min: 15, max: 15, weight: 2.5, tempo: '3 s absenken' },
+      { id: 'shoulder_press', sets: 3, min: 12, max: 12, weight: 2.5 },
+      { id: 'plank_forearm', sets: 3, hmin: 40, hmax: 40 },
+      { id: 'dead_bug', sets: 2, min: 10, max: 10, perSide: true }
+    ], measure: true }
+  ];
+
   // Vorlagen laut Trainingsplan. sets = Sätze je Seite bei perSide, sonst gesamt.
   const TEMPLATES = {
     A: {
@@ -138,6 +231,31 @@
     { id: 's-2026-11-19', date: '2026-11-19', type: 'cardio', status: 'abgeschlossen', startedAt: null, endedAt: '2026-11-19T17:51:00+01:00',
       durationMin: 25, effort: 2, effortNote: 'höchstens 2/10', feeling: null, pain: { knee: false, leftHand: false },
       notes: 'Gehen und Slow Jogging, etwa 25 Minuten.', exercises: [], source: 'import' },
+    { id: 's-2026-11-23-A', date: '2026-11-23', type: 'A', status: 'abgeschlossen', startedAt: '2026-11-23T12:25:00+01:00', endedAt: '2026-11-23T13:32:00+01:00',
+      effort: null, feeling: 4, pain: { knee: false, leftHand: false }, source: 'import', plannedTime: null,
+      notes: 'Urlaubstraining A mit anschließender Ausdauer. Gesamtdauer 67 Min. Genaue Wiederholungen teils nicht erfasst.',
+      exercises: [
+        { slotId: 'Kniebeuge', exerciseId: 'goblet_squat', effort: null, technique: null, sets: [ s(null, 8), s(null, 8) ] },
+        { slotId: 'Hüfte', exerciseId: 'kb_deadlift', effort: null, technique: null, sets: [ s(10, 8), s(null, 8) ] },
+        { slotId: 'Rücken', exerciseId: 'row_bent', effort: null, technique: null, sets: [ s(null, 2.5), s(15, 2.5), s(null, 2.5) ] },
+        { slotId: 'Drücken', exerciseId: 'press_floor', effort: null, technique: null, sets: [ s(null, 2.5), s(15, 2.5), s(null, 2.5) ] },
+        { slotId: 'Po & Beinrückseite', exerciseId: 'bridge_single', effort: null, technique: null, sets: [ s(null, null), s(null, null) ] },
+        { slotId: 'Rumpf', exerciseId: 'plank_forearm', effort: null, technique: null, sets: [ s(null, null), s(null, null) ] }
+      ] },
+    { id: 's-2026-11-25-B', date: '2026-11-25', type: 'B', status: 'abgeschlossen', startedAt: null, endedAt: '2026-11-25T17:36:00+01:00',
+      effort: null, feeling: null, pain: { knee: false, leftHand: false }, source: 'import', plannedTime: '16:00',
+      notes: 'Kraftteil Ende 17:36 Uhr. Beginn unbekannt. Gesamtrückmeldung: sehr gut, noch 2–3 Wiederholungen möglich. Schulterdrücken mit je 2,5 kg gesteigert.',
+      exercises: [
+        { slotId: 'Kniebeuge', exerciseId: 'squat_dumbbell', effort: null, technique: null, sets: [ s(15, 2.5), s(12, 2.5) ] },
+        { slotId: 'Hüfte', exerciseId: 'kb_deadlift', effort: null, technique: null, sets: [ s(null, 8), s(null, 8) ] },
+        { slotId: 'Rücken', exerciseId: 'row_bent', effort: null, technique: null, sets: [ s(20, 2.5), s(20, 2.5), s(20, 2.5) ] },
+        { slotId: 'Drücken', exerciseId: 'shoulder_press', effort: null, technique: null, sets: [ s(8, 2.5), s(8, 2.5), s(10, 2.5) ] },
+        { slotId: 'Po & Beinrückseite', exerciseId: 'hamstring_ball', effort: null, technique: null, sets: [ s(8, null), s(8, null) ] },
+        { slotId: 'Rumpf', exerciseId: 'dead_bug', effort: null, technique: null, sets: [ s(null, null), s(null, null), s(null, null), s(null, null) ] }
+      ] },
+    { id: 's-2026-11-25-cardio', date: '2026-11-25', type: 'cardio', status: 'abgeschlossen', startedAt: '2026-11-25T17:37:00+01:00', endedAt: null,
+      durationMin: 32, effort: null, feeling: null, pain: { knee: false, leftHand: false }, source: 'import', plannedTime: '17:37',
+      notes: 'Laufband gestartet 17:37 Uhr, 32 Min. geplant. Ende nicht bestätigt.', exercises: [] },
     { id: 's-2026-11-21', date: '2026-11-21', type: 'A', status: 'begonnen', startedAt: '2026-11-21T13:58:00+01:00', endedAt: null,
       effort: null, feeling: null, pain: { knee: false, leftHand: false }, notes: 'Abschluss und Sätze noch offen.', exercises: [], source: 'import' }
   ];
@@ -154,7 +272,7 @@
     timerOn: true
   };
 
-  const api = { EXERCISES, TEMPLATES, EQUIPMENT, SEED_SESSIONS, SETTINGS_DEFAULT };
+  const api = { EXERCISES, TEMPLATES, EQUIPMENT, SEED_SESSIONS, SETTINGS_DEFAULT, PLAN };
   if (typeof module === 'object' && module.exports) module.exports = api;
   root.HT_DATA = api;
 })(typeof window !== 'undefined' ? window : globalThis);

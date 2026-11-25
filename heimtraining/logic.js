@@ -88,7 +88,42 @@
   }
 
   // Übungen einer Einheit: slot-basiert. Überschreibungen (Wechsel, Erleichterung) stehen in session.swaps.
-  function buildExercises(state, type) {
+  // Vorgaben einer Plan-Zeile (aus PLAN in data.js) als Ziel-Objekt
+  function planTarget(e) {
+    const ex = EXERCISES[e.id];
+    const kind = ex.kind;
+    const t = {
+      sets: e.sets,
+      repMin: e.min != null ? e.min : null,
+      repMax: e.max != null ? e.max : null,
+      weight: e.weight != null ? e.weight : null,
+      perSide: !!(e.perSide || ex.perSide),
+      kind, tempo: e.tempo || null, note: e.note || null,
+      holdMin: e.hmin || null, holdMax: e.hmax || null,
+      source: 'plan'
+    };
+    if (kind === 'hold') { t.holdGoal = t.holdMin; t.goal = null; }
+    else if (kind === 'check') { t.goal = null; }
+    else { t.goal = t.repMin; }
+    return t;
+  }
+
+  function planEntry(planN) {
+    return D.PLAN ? D.PLAN.find(p => p.n === planN) || null : null;
+  }
+
+  function buildExercises(state, type, planN) {
+    const plan = planN ? planEntry(planN) : null;
+    if (plan) {
+      return plan.ex.map(e => {
+        const target = planTarget(e);
+        return {
+          slotId: EXERCISES[e.id].group, exerciseId: e.id, originalExerciseId: e.id, substituted: false,
+          status: 'offen', note: e.note || '', pain: false, technique: null, rir: null, effort: null,
+          target, sets: makeSets(target)
+        };
+      });
+    }
     return templateSlots(type).map(slot => {
       // Erleichterte Übung ersetzt die Vorlage für künftige Einheiten (bis rückgängig gemacht)
       const repl = state.targets && state.targets[slot.exerciseId] && state.targets[slot.exerciseId].replacedBy;
@@ -182,7 +217,7 @@
   function reassignStrengthTypes(state, today) {
     let next = nextStrengthType(state.sessions);
     const future = state.sessions
-      .filter(s => s.source === 'plan' && s.status === 'geplant' && (s.type === 'A' || s.type === 'B') && s.date >= today)
+      .filter(s => s.source === 'plan' && !s.planN && s.status === 'geplant' && (s.type === 'A' || s.type === 'B') && s.date >= today)
       .sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
     for (const s of future) { s.type = next; next = next === 'A' ? 'B' : 'A'; }
     return state;
@@ -245,7 +280,7 @@
   // Ablauf einer Einheit beim Start: Ziele werden aus dem aktuellen Verlauf übernommen
   function startSession(state, session, nowIso, pain) {
     if (session.status === 'geplant' || session.status === 'verschoben' || !session.exercises.length) {
-      session.exercises = buildExercises(state, session.type === 'cardio' ? null : session.type);
+      session.exercises = buildExercises(state, session.type === 'cardio' ? null : session.type, session.planN);
     }
     session.status = 'begonnen';
     session.startedAt = session.startedAt || nowIso;
@@ -344,7 +379,32 @@
       s.exercises.some(e => e.exerciseId === exerciseId && e.sets.some(x => x.status === 'erledigt')));
   }
 
+  // Vorschlag für die nächste Einheit aus dem Ergebnis einer Plan-Einheit. Nichts wird automatisch geändert.
+  function planSuggestions(session) {
+    const out = [];
+    for (const ex of session.exercises) {
+      const t = ex.target || {};
+      const done = ex.sets.filter(x => x.status === 'erledigt');
+      if (!done.length || t.kind === 'check') continue;
+      const name = (EXERCISES[ex.exerciseId] || { name: ex.exerciseId }).name;
+      if (t.kind === 'hold') {
+        const vals = done.map(x => x.holdSec).filter(v => v != null);
+        if (vals.length && Math.min(...vals) >= t.holdMax) out.push(`${name}: Haltezeit um 10 Sek. verlängern.`);
+        continue;
+      }
+      const reps = done.map(x => x.reps).filter(v => v != null);
+      if (!reps.length || t.repMax == null) continue;
+      if (Math.min(...reps) >= t.repMax) {
+        out.push(`${name}: oberes Ende ${t.repMax} Wdh. geschafft. Nächstes Mal Tempo, dann kürzere Pausen. Gewicht nur bei passender Reserve.`);
+      } else if (Math.min(...reps) < t.repMin) {
+        out.push(`${name}: unter dem Ziel (${t.repMin}–${t.repMax} Wdh.). Gewicht bleibt, nächstes Mal wieder anpeilen.`);
+      }
+    }
+    return out;
+  }
+
   function adjustFromSession(state, session, nowIso) {
+    if (session.planN) return { changes: [], proposals: [], suggestions: planSuggestions(session) };
     const changes = [];
     const proposals = [];
     for (const ex of session.exercises) {
@@ -404,7 +464,7 @@
       }
     }
     proposals.forEach(p => { state.proposals = state.proposals || []; state.proposals.push({ ...p, sessionId: session.id, open: true }); });
-    return { changes, proposals };
+    return { changes, proposals, suggestions: [] };
   }
 
   function snapshotTarget(t) { return JSON.parse(JSON.stringify(t)); }
@@ -608,10 +668,17 @@
     return new Date(`${date}T${time}:00+01:00`).toISOString();
   }
 
+  // Die sieben Plan-Einheiten als geplante Termine (mit fester Nummer und Startzeit 16:00)
+  function planSessions() {
+    return (D.PLAN || []).map(p => newSession(p.date, p.type, {
+      id: sessionId(p.date, p.type), planN: p.n, plannedTime: '16:00', source: 'plan', status: 'geplant'
+    }));
+  }
+
   function initialState() {
     return {
       version: 1,
-      sessions: JSON.parse(JSON.stringify(SEED_SESSIONS)),
+      sessions: JSON.parse(JSON.stringify(SEED_SESSIONS)).concat(planSessions()),
       targets: {}, adjustments: [], proposals: [],
       settings: JSON.parse(JSON.stringify(SETTINGS_DEFAULT))
     };
@@ -627,7 +694,7 @@
     calendarEventId, eventBody, icsCalendar, icsEvents,
     exportPayload, validateImport, importPayload, initialState, templateSlots, KIND_LABEL,
     planSlots, hasPreviousData, pruneFuturePlanned, berlinIso,
-    reassignStrengthTypes, createUnplanned, planSnapshot, diffPlans
+    reassignStrengthTypes, createUnplanned, planSnapshot, diffPlans, planSuggestions, planTarget
   };
   if (typeof module === 'object' && module.exports) module.exports = api;
   root.HT_LOGIC = api;

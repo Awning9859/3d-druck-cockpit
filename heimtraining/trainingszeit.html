@@ -190,6 +190,23 @@ h2.section { font-size: 13px; text-transform: uppercase; letter-spacing: .8px; c
   'use strict';
 
   const EXERCISES = {
+    warmup: {
+      name: 'Aufwärmen: Laufband und Mobilisation', group: 'Aufwärmen', kind: 'check', equipment: ['laufband', 'matte'],
+      cues: ['Laufband 0–2 Min. bei 3,0 km/h, 2–4 Min. bei 4,0 km/h, 4–5 Min. bei 4,5–5,0 km/h, Steigung 3 %.',
+             'Danach 8 Kniebeugen und 8 Hüftbeugen ohne Gewicht.'],
+      easier: null, stages: []
+    },
+    row_kb_double: {
+      name: 'Beidhändiges Kettlebell-Rudern (8 kg)', group: 'Rücken', kind: 'reps',
+      equipment: ['kettlebell'],
+      cues: ['Kettlebell am Horn mit beiden Händen, Oberkörper vorgebeugt, Rücken gerade.', 'Zum Bauch rudern, Schulterblätter zusammenziehen, langsam absenken.'],
+      easier: 'row_bent', stages: []
+    },
+    kb_swing: {
+      name: 'Kettlebell-Swing (8 kg)', group: 'Hüfte', kind: 'reps', equipment: ['kettlebell'],
+      cues: ['Die Kraft kommt aus der Hüfte, die Arme bleiben locker wie Seile.', 'Hüfte nach hinten, Kettlebell zwischen den Beinen, dann die Hüfte nach vorn schnappen lassen.', 'Rücken bleibt gerade, ausatmen beim Hochschwingen.'],
+      easier: 'kb_deadlift', stages: []
+    },
     goblet_squat: {
       name: 'Goblet Squat', group: 'Kniebeuge', kind: 'reps',
       equipment: ['kettlebell'], knee: true, grip: true,
@@ -271,6 +288,82 @@ h2.section { font-size: 13px; text-transform: uppercase; letter-spacing: .8px; c
     }
   };
 
+  // Trainingsplan: sieben Einheiten vom 27.11. bis 18.12. Die Werte sind die Vorgaben je Einheit.
+  // min/max = Wiederholungen, hmin/hmax = Haltezeit in Sekunden, weight in kg (Kurzhantel je Hand).
+  const PLAN = [
+    { n: 1, date: '2026-11-27', type: 'A', phase: 'Basis', ex: [
+      { id: 'warmup', sets: 1 },
+      { id: 'goblet_squat', sets: 3, min: 8, max: 10, weight: 8 },
+      { id: 'kb_deadlift', sets: 3, min: 10, max: 12, weight: 8 },
+      { id: 'row_kb_double', sets: 3, min: 10, max: 12, weight: 8 },
+      { id: 'press_floor', sets: 3, min: 12, max: 15, weight: 2.5, tempo: '3 s absenken' },
+      { id: 'shoulder_press', sets: 3, min: 10, max: 12, weight: 2.5 },
+      { id: 'plank_forearm', sets: 3, hmin: 30, hmax: 30 },
+      { id: 'dead_bug', sets: 2, min: 10, max: 10, perSide: true }
+    ] },
+    { n: 2, date: '2026-12-02', type: 'B', phase: 'Basis', ex: [
+      { id: 'warmup', sets: 1 },
+      { id: 'squat_dumbbell', sets: 3, min: 12, max: 12, weight: 2.5, tempo: '3 s absenken' },
+      { id: 'kb_deadlift', sets: 3, min: 10, max: 12, weight: 8 },
+      { id: 'bridge_single', sets: 2, min: 10, max: 10, weight: 8, perSide: true, note: 'Kettlebell auf der Hüfte' },
+      { id: 'row_bent', sets: 3, min: 12, max: 12, weight: 2.5 },
+      { id: 'shoulder_press', sets: 3, min: 12, max: 12, weight: 1.5 },
+      { id: 'hamstring_ball', sets: 2, min: 10, max: 10 },
+      { id: 'dead_bug', sets: 2, min: 10, max: 10, perSide: true }
+    ] },
+    { n: 3, date: '2026-12-04', type: 'A', phase: 'Steigerung', ex: [
+      { id: 'warmup', sets: 1 },
+      { id: 'goblet_squat', sets: 3, min: 10, max: 12, weight: 8 },
+      { id: 'kb_deadlift', sets: 3, min: 12, max: 15, weight: 8 },
+      { id: 'row_kb_double', sets: 3, min: 12, max: 15, weight: 8 },
+      { id: 'press_floor', sets: 3, min: 12, max: 15, weight: 2.5 },
+      { id: 'shoulder_press', sets: 3, min: 10, max: 12, weight: 2.5 },
+      { id: 'plank_forearm', sets: 3, hmin: 35, hmax: 35 },
+      { id: 'dead_bug', sets: 2, min: 10, max: 10, perSide: true }
+    ] },
+    { n: 4, date: '2026-12-09', type: 'B', phase: 'Steigerung', ex: [
+      { id: 'warmup', sets: 1 },
+      { id: 'squat_dumbbell', sets: 3, min: 12, max: 15, weight: 2.5, tempo: '3 s absenken' },
+      { id: 'kb_deadlift', sets: 3, min: 12, max: 15, weight: 8, tempo: '3-1-1' },
+      { id: 'bridge_single', sets: 2, min: 12, max: 12, weight: 8, perSide: true, note: 'Kettlebell auf der Hüfte' },
+      { id: 'row_bent', sets: 3, min: 12, max: 15, weight: 2.5 },
+      { id: 'shoulder_press', sets: 3, min: 12, max: 15, weight: 1.5 },
+      { id: 'hamstring_ball', sets: 2, min: 10, max: 12 },
+      { id: 'dead_bug', sets: 2, min: 10, max: 10, perSide: true }
+    ] },
+    { n: 5, date: '2026-12-11', type: 'A', phase: 'Tempo', ex: [
+      { id: 'warmup', sets: 1 },
+      { id: 'goblet_squat', sets: 3, min: 12, max: 12, weight: 8, tempo: '2 s unten halten' },
+      { id: 'kb_deadlift', sets: 3, min: 15, max: 15, weight: 8, tempo: '3-1-1' },
+      { id: 'row_kb_double', sets: 3, min: 15, max: 15, weight: 8, tempo: '2 s oben halten' },
+      { id: 'press_floor', sets: 3, min: 15, max: 15, weight: 2.5, tempo: '3 s runter, 1 s unten' },
+      { id: 'shoulder_press', sets: 3, min: 12, max: 12, weight: 2.5 },
+      { id: 'plank_forearm', sets: 3, hmin: 40, hmax: 40 },
+      { id: 'dead_bug', sets: 2, min: 10, max: 10, perSide: true }
+    ] },
+    { n: 6, date: '2026-12-16', type: 'B', phase: 'Tempo und Schwung', ex: [
+      { id: 'warmup', sets: 1 },
+      { id: 'squat_dumbbell', sets: 3, min: 15, max: 15, weight: 2.5, tempo: '3 s absenken' },
+      { id: 'kb_deadlift', sets: 3, min: 15, max: 15, weight: 8, tempo: '3-1-1' },
+      { id: 'kb_swing', sets: 2, min: 10, max: 10, weight: 8 },
+      { id: 'bridge_single', sets: 2, min: 12, max: 12, weight: 8, perSide: true, note: 'Kettlebell auf der Hüfte' },
+      { id: 'row_bent', sets: 3, min: 15, max: 15, weight: 2.5, tempo: '2 s oben halten' },
+      { id: 'shoulder_press', sets: 3, min: 15, max: 15, weight: 1.5 },
+      { id: 'hamstring_ball', sets: 2, min: 12, max: 12 },
+      { id: 'dead_bug', sets: 2, min: 10, max: 10, perSide: true }
+    ] },
+    { n: 7, date: '2026-12-18', type: 'A', phase: 'Abschluss und Messung', ex: [
+      { id: 'warmup', sets: 1 },
+      { id: 'goblet_squat', sets: 3, min: 12, max: 12, weight: 8, tempo: '2 s unten halten' },
+      { id: 'kb_deadlift', sets: 3, min: 15, max: 15, weight: 8, tempo: '3-1-1' },
+      { id: 'row_kb_double', sets: 3, min: 15, max: 15, weight: 8, tempo: '2 s oben halten' },
+      { id: 'press_floor', sets: 3, min: 15, max: 15, weight: 2.5, tempo: '3 s absenken' },
+      { id: 'shoulder_press', sets: 3, min: 12, max: 12, weight: 2.5 },
+      { id: 'plank_forearm', sets: 3, hmin: 40, hmax: 40 },
+      { id: 'dead_bug', sets: 2, min: 10, max: 10, perSide: true }
+    ], measure: true }
+  ];
+
   // Vorlagen laut Trainingsplan. sets = Sätze je Seite bei perSide, sonst gesamt.
   const TEMPLATES = {
     A: {
@@ -325,6 +418,31 @@ h2.section { font-size: 13px; text-transform: uppercase; letter-spacing: .8px; c
     { id: 's-2026-11-19', date: '2026-11-19', type: 'cardio', status: 'abgeschlossen', startedAt: null, endedAt: '2026-11-19T17:51:00+01:00',
       durationMin: 25, effort: 2, effortNote: 'höchstens 2/10', feeling: null, pain: { knee: false, leftHand: false },
       notes: 'Gehen und Slow Jogging, etwa 25 Minuten.', exercises: [], source: 'import' },
+    { id: 's-2026-11-23-A', date: '2026-11-23', type: 'A', status: 'abgeschlossen', startedAt: '2026-11-23T12:25:00+01:00', endedAt: '2026-11-23T13:32:00+01:00',
+      effort: null, feeling: 4, pain: { knee: false, leftHand: false }, source: 'import', plannedTime: null,
+      notes: 'Urlaubstraining A mit anschließender Ausdauer. Gesamtdauer 67 Min. Genaue Wiederholungen teils nicht erfasst.',
+      exercises: [
+        { slotId: 'Kniebeuge', exerciseId: 'goblet_squat', effort: null, technique: null, sets: [ s(null, 8), s(null, 8) ] },
+        { slotId: 'Hüfte', exerciseId: 'kb_deadlift', effort: null, technique: null, sets: [ s(10, 8), s(null, 8) ] },
+        { slotId: 'Rücken', exerciseId: 'row_bent', effort: null, technique: null, sets: [ s(null, 2.5), s(15, 2.5), s(null, 2.5) ] },
+        { slotId: 'Drücken', exerciseId: 'press_floor', effort: null, technique: null, sets: [ s(null, 2.5), s(15, 2.5), s(null, 2.5) ] },
+        { slotId: 'Po & Beinrückseite', exerciseId: 'bridge_single', effort: null, technique: null, sets: [ s(null, null), s(null, null) ] },
+        { slotId: 'Rumpf', exerciseId: 'plank_forearm', effort: null, technique: null, sets: [ s(null, null), s(null, null) ] }
+      ] },
+    { id: 's-2026-11-25-B', date: '2026-11-25', type: 'B', status: 'abgeschlossen', startedAt: null, endedAt: '2026-11-25T17:36:00+01:00',
+      effort: null, feeling: null, pain: { knee: false, leftHand: false }, source: 'import', plannedTime: '16:00',
+      notes: 'Kraftteil Ende 17:36 Uhr. Beginn unbekannt. Gesamtrückmeldung: sehr gut, noch 2–3 Wiederholungen möglich. Schulterdrücken mit je 2,5 kg gesteigert.',
+      exercises: [
+        { slotId: 'Kniebeuge', exerciseId: 'squat_dumbbell', effort: null, technique: null, sets: [ s(15, 2.5), s(12, 2.5) ] },
+        { slotId: 'Hüfte', exerciseId: 'kb_deadlift', effort: null, technique: null, sets: [ s(null, 8), s(null, 8) ] },
+        { slotId: 'Rücken', exerciseId: 'row_bent', effort: null, technique: null, sets: [ s(20, 2.5), s(20, 2.5), s(20, 2.5) ] },
+        { slotId: 'Drücken', exerciseId: 'shoulder_press', effort: null, technique: null, sets: [ s(8, 2.5), s(8, 2.5), s(10, 2.5) ] },
+        { slotId: 'Po & Beinrückseite', exerciseId: 'hamstring_ball', effort: null, technique: null, sets: [ s(8, null), s(8, null) ] },
+        { slotId: 'Rumpf', exerciseId: 'dead_bug', effort: null, technique: null, sets: [ s(null, null), s(null, null), s(null, null), s(null, null) ] }
+      ] },
+    { id: 's-2026-11-25-cardio', date: '2026-11-25', type: 'cardio', status: 'abgeschlossen', startedAt: '2026-11-25T17:37:00+01:00', endedAt: null,
+      durationMin: 32, effort: null, feeling: null, pain: { knee: false, leftHand: false }, source: 'import', plannedTime: '17:37',
+      notes: 'Laufband gestartet 17:37 Uhr, 32 Min. geplant. Ende nicht bestätigt.', exercises: [] },
     { id: 's-2026-11-21', date: '2026-11-21', type: 'A', status: 'begonnen', startedAt: '2026-11-21T13:58:00+01:00', endedAt: null,
       effort: null, feeling: null, pain: { knee: false, leftHand: false }, notes: 'Abschluss und Sätze noch offen.', exercises: [], source: 'import' }
   ];
@@ -341,7 +459,7 @@ h2.section { font-size: 13px; text-transform: uppercase; letter-spacing: .8px; c
     timerOn: true
   };
 
-  const api = { EXERCISES, TEMPLATES, EQUIPMENT, SEED_SESSIONS, SETTINGS_DEFAULT };
+  const api = { EXERCISES, TEMPLATES, EQUIPMENT, SEED_SESSIONS, SETTINGS_DEFAULT, PLAN };
   if (typeof module === 'object' && module.exports) module.exports = api;
   root.HT_DATA = api;
 })(typeof window !== 'undefined' ? window : globalThis);
@@ -438,7 +556,42 @@ h2.section { font-size: 13px; text-transform: uppercase; letter-spacing: .8px; c
   }
 
   // Übungen einer Einheit: slot-basiert. Überschreibungen (Wechsel, Erleichterung) stehen in session.swaps.
-  function buildExercises(state, type) {
+  // Vorgaben einer Plan-Zeile (aus PLAN in data.js) als Ziel-Objekt
+  function planTarget(e) {
+    const ex = EXERCISES[e.id];
+    const kind = ex.kind;
+    const t = {
+      sets: e.sets,
+      repMin: e.min != null ? e.min : null,
+      repMax: e.max != null ? e.max : null,
+      weight: e.weight != null ? e.weight : null,
+      perSide: !!(e.perSide || ex.perSide),
+      kind, tempo: e.tempo || null, note: e.note || null,
+      holdMin: e.hmin || null, holdMax: e.hmax || null,
+      source: 'plan'
+    };
+    if (kind === 'hold') { t.holdGoal = t.holdMin; t.goal = null; }
+    else if (kind === 'check') { t.goal = null; }
+    else { t.goal = t.repMin; }
+    return t;
+  }
+
+  function planEntry(planN) {
+    return D.PLAN ? D.PLAN.find(p => p.n === planN) || null : null;
+  }
+
+  function buildExercises(state, type, planN) {
+    const plan = planN ? planEntry(planN) : null;
+    if (plan) {
+      return plan.ex.map(e => {
+        const target = planTarget(e);
+        return {
+          slotId: EXERCISES[e.id].group, exerciseId: e.id, originalExerciseId: e.id, substituted: false,
+          status: 'offen', note: e.note || '', pain: false, technique: null, rir: null, effort: null,
+          target, sets: makeSets(target)
+        };
+      });
+    }
     return templateSlots(type).map(slot => {
       // Erleichterte Übung ersetzt die Vorlage für künftige Einheiten (bis rückgängig gemacht)
       const repl = state.targets && state.targets[slot.exerciseId] && state.targets[slot.exerciseId].replacedBy;
@@ -532,7 +685,7 @@ h2.section { font-size: 13px; text-transform: uppercase; letter-spacing: .8px; c
   function reassignStrengthTypes(state, today) {
     let next = nextStrengthType(state.sessions);
     const future = state.sessions
-      .filter(s => s.source === 'plan' && s.status === 'geplant' && (s.type === 'A' || s.type === 'B') && s.date >= today)
+      .filter(s => s.source === 'plan' && !s.planN && s.status === 'geplant' && (s.type === 'A' || s.type === 'B') && s.date >= today)
       .sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
     for (const s of future) { s.type = next; next = next === 'A' ? 'B' : 'A'; }
     return state;
@@ -595,7 +748,7 @@ h2.section { font-size: 13px; text-transform: uppercase; letter-spacing: .8px; c
   // Ablauf einer Einheit beim Start: Ziele werden aus dem aktuellen Verlauf übernommen
   function startSession(state, session, nowIso, pain) {
     if (session.status === 'geplant' || session.status === 'verschoben' || !session.exercises.length) {
-      session.exercises = buildExercises(state, session.type === 'cardio' ? null : session.type);
+      session.exercises = buildExercises(state, session.type === 'cardio' ? null : session.type, session.planN);
     }
     session.status = 'begonnen';
     session.startedAt = session.startedAt || nowIso;
@@ -694,7 +847,32 @@ h2.section { font-size: 13px; text-transform: uppercase; letter-spacing: .8px; c
       s.exercises.some(e => e.exerciseId === exerciseId && e.sets.some(x => x.status === 'erledigt')));
   }
 
+  // Vorschlag für die nächste Einheit aus dem Ergebnis einer Plan-Einheit. Nichts wird automatisch geändert.
+  function planSuggestions(session) {
+    const out = [];
+    for (const ex of session.exercises) {
+      const t = ex.target || {};
+      const done = ex.sets.filter(x => x.status === 'erledigt');
+      if (!done.length || t.kind === 'check') continue;
+      const name = (EXERCISES[ex.exerciseId] || { name: ex.exerciseId }).name;
+      if (t.kind === 'hold') {
+        const vals = done.map(x => x.holdSec).filter(v => v != null);
+        if (vals.length && Math.min(...vals) >= t.holdMax) out.push(`${name}: Haltezeit um 10 Sek. verlängern.`);
+        continue;
+      }
+      const reps = done.map(x => x.reps).filter(v => v != null);
+      if (!reps.length || t.repMax == null) continue;
+      if (Math.min(...reps) >= t.repMax) {
+        out.push(`${name}: oberes Ende ${t.repMax} Wdh. geschafft. Nächstes Mal Tempo, dann kürzere Pausen. Gewicht nur bei passender Reserve.`);
+      } else if (Math.min(...reps) < t.repMin) {
+        out.push(`${name}: unter dem Ziel (${t.repMin}–${t.repMax} Wdh.). Gewicht bleibt, nächstes Mal wieder anpeilen.`);
+      }
+    }
+    return out;
+  }
+
   function adjustFromSession(state, session, nowIso) {
+    if (session.planN) return { changes: [], proposals: [], suggestions: planSuggestions(session) };
     const changes = [];
     const proposals = [];
     for (const ex of session.exercises) {
@@ -754,7 +932,7 @@ h2.section { font-size: 13px; text-transform: uppercase; letter-spacing: .8px; c
       }
     }
     proposals.forEach(p => { state.proposals = state.proposals || []; state.proposals.push({ ...p, sessionId: session.id, open: true }); });
-    return { changes, proposals };
+    return { changes, proposals, suggestions: [] };
   }
 
   function snapshotTarget(t) { return JSON.parse(JSON.stringify(t)); }
@@ -958,10 +1136,17 @@ h2.section { font-size: 13px; text-transform: uppercase; letter-spacing: .8px; c
     return new Date(`${date}T${time}:00+01:00`).toISOString();
   }
 
+  // Die sieben Plan-Einheiten als geplante Termine (mit fester Nummer und Startzeit 16:00)
+  function planSessions() {
+    return (D.PLAN || []).map(p => newSession(p.date, p.type, {
+      id: sessionId(p.date, p.type), planN: p.n, plannedTime: '16:00', source: 'plan', status: 'geplant'
+    }));
+  }
+
   function initialState() {
     return {
       version: 1,
-      sessions: JSON.parse(JSON.stringify(SEED_SESSIONS)),
+      sessions: JSON.parse(JSON.stringify(SEED_SESSIONS)).concat(planSessions()),
       targets: {}, adjustments: [], proposals: [],
       settings: JSON.parse(JSON.stringify(SETTINGS_DEFAULT))
     };
@@ -977,7 +1162,7 @@ h2.section { font-size: 13px; text-transform: uppercase; letter-spacing: .8px; c
     calendarEventId, eventBody, icsCalendar, icsEvents,
     exportPayload, validateImport, importPayload, initialState, templateSlots, KIND_LABEL,
     planSlots, hasPreviousData, pruneFuturePlanned, berlinIso,
-    reassignStrengthTypes, createUnplanned, planSnapshot, diffPlans
+    reassignStrengthTypes, createUnplanned, planSnapshot, diffPlans, planSuggestions, planTarget
   };
   if (typeof module === 'object' && module.exports) module.exports = api;
   root.HT_LOGIC = api;
@@ -1180,7 +1365,7 @@ h2.section { font-size: 13px; text-transform: uppercase; letter-spacing: .8px; c
 
   function strengthHero(s) {
     const started = s.status === 'begonnen';
-    const preview = s.exercises.length ? s.exercises : L.buildExercises(state, s.type);
+    const preview = s.exercises.length ? s.exercises : L.buildExercises(state, s.type, s.planN);
     const when = s.plannedTime ? `${L.fmtDate(s.date, false)} · ${s.plannedTime} Uhr` : `${L.fmtDate(s.date, false)} · Zeit offen`;
     const startedNote = started && s.startedAt ? `<div class="muted" style="margin-top:6px">Begonnen um ${esc(berlinHM(s.startedAt))} Uhr · ${esc(L.fmtDate(s.date, false))}</div>` : '';
     let h = `<div class="hero"><div class="art">${kettlebellArt()}</div><div class="body">
@@ -1232,7 +1417,7 @@ h2.section { font-size: 13px; text-transform: uppercase; letter-spacing: .8px; c
       : mode === 'rudern' ? { label: 'Lockeres Rudern', speed: 'Tempo nach Gefühl' }
       : { label: 'Slow Jogging', speed: '5,0 km/h' };
     const walk = { label: 'Gehen', speed: '3,2 km/h' };
-    const b = [{ label: 'Einlaufen', speed: '3,0 km/h', sec: 300 }];
+    const b = [{ label: 'Einlaufen', speed: '3,2 km/h', sec: 300 }];
     for (let i = 0; i < 4; i++) {
       b.push({ label: move.label, speed: move.speed, sec: 240 });
       if (i < 3) b.push({ label: walk.label, speed: walk.speed, sec: 120 });
@@ -1372,13 +1557,13 @@ h2.section { font-size: 13px; text-transform: uppercase; letter-spacing: .8px; c
     const s = find(id);
     if (!s) return;
     if (s.type === 'cardio') { startCardio(s); return; }
-    const preview = L.buildExercises(state, s.type);
+    const preview = L.buildExercises(state, s.type, s.planN);
     pre = { id, feeling: null, knee: false, leftHand: false, choices: {}, type: s.type, probe: {} };
     preRender(preview);
   }
   function preRender(preview) {
     const s = find(pre.id);
-    const exs = preview || L.buildExercises(state, s.type);
+    const exs = preview || L.buildExercises(state, s.type, s.planN);
     const affected = exs.filter(e => {
       const d = D.EXERCISES[e.exerciseId];
       return (pre.knee && d.knee) || (pre.leftHand && d.grip);
@@ -1484,7 +1669,10 @@ h2.section { font-size: 13px; text-transform: uppercase; letter-spacing: .8px; c
   function beginSession() {
     const s = find(pre.id);
     if (!s) return;
-    if (s.status === 'geplant' && pre.type && (s.type === 'A' || s.type === 'B')) s.type = pre.type;
+    if (s.status === 'geplant' && pre.type && (s.type === 'A' || s.type === 'B')) {
+      if (pre.type !== s.type) s.planN = null; // anderer Typ: Vorlage statt Plan-Übungen
+      s.type = pre.type;
+    }
     L.startSession(state, s, nowIso(), { knee: pre.knee, leftHand: pre.leftHand, feeling: pre.feeling });
     s.feeling = pre.feeling;
     // Neue Kettlebell-Übungen ohne Technikprobe starten ohne Gewicht
@@ -1572,10 +1760,12 @@ h2.section { font-size: 13px; text-transform: uppercase; letter-spacing: .8px; c
       <div class="ex-name">${esc(def.name)}</div>
       ${ex.substituted ? '<div class="center" style="margin-bottom:6px"><span class="tag">Ersatzübung</span></div>' : ''}
       <div class="center"><button class="pill" data-act="cues">${icon('play')} Technik ansehen</button></div>
-      <div class="tiles">${wTile}${rTile}</div>
+      ${t.kind === 'check'
+        ? `<div class="card" style="margin-top:14px"><ul class="cues">${def.cues.map(c => `<li>${esc(c)}</li>`).join('')}</ul></div>`
+        : `<div class="tiles">${wTile}${rTile}</div>${t.tempo ? `<div class="muted" style="text-align:center;margin-top:8px">Tempo: ${esc(t.tempo)}</div>` : ''}${t.note ? `<div class="muted" style="text-align:center">${esc(t.note)}</div>` : ''}`}
       <div class="setdots">${esc(setLabel(set, ex.sets.length, pos.set))}</div>
       <div class="dots">${dots}</div>
-      <button class="btn" data-act="done">${icon('check')}Satz erledigt</button>
+      <button class="btn" data-act="done">${icon('check')}${t.kind === 'check' ? 'Erledigt' : 'Satz erledigt'}</button>
       ${timer}
       <div class="actions">
         <button data-act="skipSet">${icon('skip')} Satz überspringen</button>
@@ -1631,12 +1821,12 @@ h2.section { font-size: 13px; text-transform: uppercase; letter-spacing: .8px; c
     const total = blocks.reduce((a, b) => a + b.sec, 0);
     const elapsed = Math.max(0, (Date.now() - Date.parse(s.startedAt)) / 1000);
     let acc = 0, cur = null;
-    for (const b of blocks) { if (elapsed < acc + b.sec) { cur = { ...b, inBlock: elapsed - acc }; break; } acc += b.sec; }
+    for (const b of blocks) { if (elapsed < acc + b.sec) { cur = { ...b, inBlock: elapsed - acc, end: acc + b.sec }; break; } acc += b.sec; }
     const finished = elapsed >= total;
     const focus = finished
       ? `<div class="ex-name">Geschafft</div>`
       : `<div class="ex-name">${esc(cur.label)}</div><div class="center muted">${esc(cur.speed)}</div>
-         <div class="timer"><div class="big" id="timerBig">${clockOf(cur.inBlock)}</div><div class="muted" style="font-size:18px;font-weight:700;color:var(--ink)">${esc(cur.speed)} bis ${clockOf(cur.sec)}</div><div class="muted">noch ${clockOf(cur.sec - cur.inBlock)} bis zum Wechsel</div></div>`;
+         <div class="timer"><div class="big" id="timerBig">${clockOf(cur.inBlock)}</div><div class="muted" style="font-size:18px;font-weight:700;color:var(--ink)">${esc(cur.speed)} bis ${clockOf(cur.end)}</div><div class="muted">noch ${clockOf(cur.sec - cur.inBlock)} bis zum Wechsel</div></div>`;
     return `<div class="runner"><div class="inner">
       <div class="head"><button class="icon-btn" data-act="leave" aria-label="Später fortsetzen">${icon('back')}</button><h2>Ausdauer</h2><span></span></div>
       <div class="ctx">Gesamt ${clockOf(elapsed)} von ${clockOf(total)}</div>
@@ -1724,7 +1914,7 @@ h2.section { font-size: 13px; text-transform: uppercase; letter-spacing: .8px; c
   }
 
   function planSheet(s) {
-    const exs = L.buildExercises(state, s.type === 'cardio' ? 'A' : s.type);
+    const exs = L.buildExercises(state, s.type === 'cardio' ? 'A' : s.type, s.planN);
     const list = s.type === 'cardio' ? '' : exs.map(e => {
       const def = D.EXERCISES[e.exerciseId];
       return `<div class="check" style="justify-content:space-between"><span>${esc(def.name)}</span><span class="muted">${esc(targetText(e.target || L.currentTarget(state, e.exerciseId), e))}</span></div>`;
@@ -1773,11 +1963,12 @@ h2.section { font-size: 13px; text-transform: uppercase; letter-spacing: .8px; c
     draft._finish = { effort: null, feeling: null };
   }
 
-  function resultSheet(s, changes) {
+  function resultSheet(s, changes, suggestions) {
     const props = (state.proposals || []).map((p, i) => ({ p, i })).filter(x => x.p.open && x.p.sessionId === s.id);
     const status = { abgeschlossen: 'Abgeschlossen.', teilweise: 'Teilweise absolviert. Die erledigten Sätze bleiben im Verlauf.', abgebrochen: 'Abgebrochen. Ohne erledigte Sätze.' }[s.status] || '';
     openSheet(`<h3>Gespeichert</h3>
       <div class="banner ok" style="background:var(--ok-bg)">${esc(status)}</div>
+      ${suggestions && suggestions.length ? `<h2 class="section">Vorschlag für die nächste Einheit</h2>` + suggestions.map(t => `<div class="note-box">${esc(t)}</div>`).join('') : ''}
       ${changes.length ? `<h2 class="section">Automatisch angepasst</h2>` + changes.map(c => {
         const ex = D.EXERCISES[c.exerciseId] || { name: c.exerciseId };
         return `<div class="card"><div class="title">${esc(ex.name)}</div><div class="muted" style="margin:4px 0 8px">${esc(c.reason)}</div>
@@ -1898,11 +2089,11 @@ h2.section { font-size: 13px; text-transform: uppercase; letter-spacing: .8px; c
     s.pain = { knee, leftHand: hand };
     L.completeSession(s, { startedAt, endedAt, effort: fin.effort, feeling: fin.feeling, notes });
     if (cal && cal.checked) s.calendarOptIn = true;
-    const changes = L.adjustFromSession(state, s, nowIso()).changes;
+    const res = L.adjustFromSession(state, s, nowIso());
     delete draft._finish;
     ui.open = null;
     persist(); closeSheet(); render();
-    resultSheet(s, changes);
+    resultSheet(s, res.changes, res.suggestions);
   }
   function berlinIsoLocal(date, time) { return L.berlinIso(date, time); }
 

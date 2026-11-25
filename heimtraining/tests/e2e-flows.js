@@ -17,11 +17,12 @@ const url = process.argv[2] || 'http://localhost:8765/index.html';
   await page.evaluate(() => localStorage.clear());
   await page.reload();
   // Start-Zustand: die offene A-Einheit vom 21.11. wird als geplant zurückgesetzt (Test für Typwechsel)
-  await page.evaluate(() => { const s = JSON.parse(localStorage.getItem('heimtraining.v1')); const x = s.sessions.find(q => q.id === 's-2026-11-21'); x.status = 'geplant'; x.startedAt = null; x.exercises = []; localStorage.setItem('heimtraining.v1', JSON.stringify(s)); });
+  // Die offene Einheit vom 21.11. gilt für diesen Test als abgebrochen, damit die nächste Plan-Einheit angezeigt wird
+  await page.evaluate(() => { const s = JSON.parse(localStorage.getItem('heimtraining.v1')); s.sessions.find(q => q.id === 's-2026-11-21').status = 'abgebrochen'; localStorage.setItem('heimtraining.v1', JSON.stringify(s)); });
   await page.reload();
 
   // (1) Abweichend: geplant A, gemacht B
-  await page.click('[data-act="start"][data-id="s-2026-11-21"]');
+  await page.click('[data-act="start"][data-id="s-2026-11-27-A"]');
   await page.waitForSelector('[data-act="preType"]');
   await page.click('[data-act="preType"][data-v="B"]');
   await page.click('[data-act="preStart"]');
@@ -38,11 +39,10 @@ const url = process.argv[2] || 'http://localhost:8765/index.html';
   await page.waitForSelector('text=Gespeichert');
   await page.click('.sheet [data-act="close"]');
   let st = await store();
-  const s21 = st.sessions.find(x => x.id === 's-2026-11-21');
-  check('Abweichend: Einheit ist als B gespeichert', s21.type === 'B', s21.type);
-  check('Abweichend: Status nach Abschluss', ['abgeschlossen', 'teilweise'].includes(s21.status), s21.status);
-  const future = st.sessions.filter(x => x.status === 'geplant' && (x.type === 'A' || x.type === 'B') && x.date > '2026-11-21').sort((a, b) => (a.date < b.date ? -1 : 1));
-  check('Abweichend: nächste geplante Einheit ist A', future[0] && future[0].type === 'A', future[0] && future[0].date + ' ' + future[0].type);
+  const s27 = st.sessions.find(x => x.id === 's-2026-11-27-A');
+  check('Abweichend: Einheit ist als B gespeichert', s27.type === 'B', s27.type);
+  check('Abweichend: Status nach Abschluss', ['abgeschlossen', 'teilweise'].includes(s27.status), s27.status);
+  check('Abweichend: Plan-Einheit 2 (2.12.) bleibt fest als B', st.sessions.some(x => x.planN === 2 && x.type === 'B' && x.date === '2026-12-02'));
 
   // (2) Spontan trainieren
   await page.click('[data-act="spontan"]');

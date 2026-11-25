@@ -193,7 +193,7 @@
 
   function strengthHero(s) {
     const started = s.status === 'begonnen';
-    const preview = s.exercises.length ? s.exercises : L.buildExercises(state, s.type);
+    const preview = s.exercises.length ? s.exercises : L.buildExercises(state, s.type, s.planN);
     const when = s.plannedTime ? `${L.fmtDate(s.date, false)} · ${s.plannedTime} Uhr` : `${L.fmtDate(s.date, false)} · Zeit offen`;
     const startedNote = started && s.startedAt ? `<div class="muted" style="margin-top:6px">Begonnen um ${esc(berlinHM(s.startedAt))} Uhr · ${esc(L.fmtDate(s.date, false))}</div>` : '';
     let h = `<div class="hero"><div class="art">${kettlebellArt()}</div><div class="body">
@@ -245,7 +245,7 @@
       : mode === 'rudern' ? { label: 'Lockeres Rudern', speed: 'Tempo nach Gefühl' }
       : { label: 'Slow Jogging', speed: '5,0 km/h' };
     const walk = { label: 'Gehen', speed: '3,2 km/h' };
-    const b = [{ label: 'Einlaufen', speed: '3,0 km/h', sec: 300 }];
+    const b = [{ label: 'Einlaufen', speed: '3,2 km/h', sec: 300 }];
     for (let i = 0; i < 4; i++) {
       b.push({ label: move.label, speed: move.speed, sec: 240 });
       if (i < 3) b.push({ label: walk.label, speed: walk.speed, sec: 120 });
@@ -385,13 +385,13 @@
     const s = find(id);
     if (!s) return;
     if (s.type === 'cardio') { startCardio(s); return; }
-    const preview = L.buildExercises(state, s.type);
+    const preview = L.buildExercises(state, s.type, s.planN);
     pre = { id, feeling: null, knee: false, leftHand: false, choices: {}, type: s.type, probe: {} };
     preRender(preview);
   }
   function preRender(preview) {
     const s = find(pre.id);
-    const exs = preview || L.buildExercises(state, s.type);
+    const exs = preview || L.buildExercises(state, s.type, s.planN);
     const affected = exs.filter(e => {
       const d = D.EXERCISES[e.exerciseId];
       return (pre.knee && d.knee) || (pre.leftHand && d.grip);
@@ -497,7 +497,10 @@
   function beginSession() {
     const s = find(pre.id);
     if (!s) return;
-    if (s.status === 'geplant' && pre.type && (s.type === 'A' || s.type === 'B')) s.type = pre.type;
+    if (s.status === 'geplant' && pre.type && (s.type === 'A' || s.type === 'B')) {
+      if (pre.type !== s.type) s.planN = null; // anderer Typ: Vorlage statt Plan-Übungen
+      s.type = pre.type;
+    }
     L.startSession(state, s, nowIso(), { knee: pre.knee, leftHand: pre.leftHand, feeling: pre.feeling });
     s.feeling = pre.feeling;
     // Neue Kettlebell-Übungen ohne Technikprobe starten ohne Gewicht
@@ -585,10 +588,12 @@
       <div class="ex-name">${esc(def.name)}</div>
       ${ex.substituted ? '<div class="center" style="margin-bottom:6px"><span class="tag">Ersatzübung</span></div>' : ''}
       <div class="center"><button class="pill" data-act="cues">${icon('play')} Technik ansehen</button></div>
-      <div class="tiles">${wTile}${rTile}</div>
+      ${t.kind === 'check'
+        ? `<div class="card" style="margin-top:14px"><ul class="cues">${def.cues.map(c => `<li>${esc(c)}</li>`).join('')}</ul></div>`
+        : `<div class="tiles">${wTile}${rTile}</div>${t.tempo ? `<div class="muted" style="text-align:center;margin-top:8px">Tempo: ${esc(t.tempo)}</div>` : ''}${t.note ? `<div class="muted" style="text-align:center">${esc(t.note)}</div>` : ''}`}
       <div class="setdots">${esc(setLabel(set, ex.sets.length, pos.set))}</div>
       <div class="dots">${dots}</div>
-      <button class="btn" data-act="done">${icon('check')}Satz erledigt</button>
+      <button class="btn" data-act="done">${icon('check')}${t.kind === 'check' ? 'Erledigt' : 'Satz erledigt'}</button>
       ${timer}
       <div class="actions">
         <button data-act="skipSet">${icon('skip')} Satz überspringen</button>
@@ -644,12 +649,12 @@
     const total = blocks.reduce((a, b) => a + b.sec, 0);
     const elapsed = Math.max(0, (Date.now() - Date.parse(s.startedAt)) / 1000);
     let acc = 0, cur = null;
-    for (const b of blocks) { if (elapsed < acc + b.sec) { cur = { ...b, inBlock: elapsed - acc }; break; } acc += b.sec; }
+    for (const b of blocks) { if (elapsed < acc + b.sec) { cur = { ...b, inBlock: elapsed - acc, end: acc + b.sec }; break; } acc += b.sec; }
     const finished = elapsed >= total;
     const focus = finished
       ? `<div class="ex-name">Geschafft</div>`
       : `<div class="ex-name">${esc(cur.label)}</div><div class="center muted">${esc(cur.speed)}</div>
-         <div class="timer"><div class="big" id="timerBig">${clockOf(cur.inBlock)}</div><div class="muted" style="font-size:18px;font-weight:700;color:var(--ink)">${esc(cur.speed)} bis ${clockOf(cur.sec)}</div><div class="muted">noch ${clockOf(cur.sec - cur.inBlock)} bis zum Wechsel</div></div>`;
+         <div class="timer"><div class="big" id="timerBig">${clockOf(cur.inBlock)}</div><div class="muted" style="font-size:18px;font-weight:700;color:var(--ink)">${esc(cur.speed)} bis ${clockOf(cur.end)}</div><div class="muted">noch ${clockOf(cur.sec - cur.inBlock)} bis zum Wechsel</div></div>`;
     return `<div class="runner"><div class="inner">
       <div class="head"><button class="icon-btn" data-act="leave" aria-label="Später fortsetzen">${icon('back')}</button><h2>Ausdauer</h2><span></span></div>
       <div class="ctx">Gesamt ${clockOf(elapsed)} von ${clockOf(total)}</div>
@@ -737,7 +742,7 @@
   }
 
   function planSheet(s) {
-    const exs = L.buildExercises(state, s.type === 'cardio' ? 'A' : s.type);
+    const exs = L.buildExercises(state, s.type === 'cardio' ? 'A' : s.type, s.planN);
     const list = s.type === 'cardio' ? '' : exs.map(e => {
       const def = D.EXERCISES[e.exerciseId];
       return `<div class="check" style="justify-content:space-between"><span>${esc(def.name)}</span><span class="muted">${esc(targetText(e.target || L.currentTarget(state, e.exerciseId), e))}</span></div>`;
@@ -786,11 +791,12 @@
     draft._finish = { effort: null, feeling: null };
   }
 
-  function resultSheet(s, changes) {
+  function resultSheet(s, changes, suggestions) {
     const props = (state.proposals || []).map((p, i) => ({ p, i })).filter(x => x.p.open && x.p.sessionId === s.id);
     const status = { abgeschlossen: 'Abgeschlossen.', teilweise: 'Teilweise absolviert. Die erledigten Sätze bleiben im Verlauf.', abgebrochen: 'Abgebrochen. Ohne erledigte Sätze.' }[s.status] || '';
     openSheet(`<h3>Gespeichert</h3>
       <div class="banner ok" style="background:var(--ok-bg)">${esc(status)}</div>
+      ${suggestions && suggestions.length ? `<h2 class="section">Vorschlag für die nächste Einheit</h2>` + suggestions.map(t => `<div class="note-box">${esc(t)}</div>`).join('') : ''}
       ${changes.length ? `<h2 class="section">Automatisch angepasst</h2>` + changes.map(c => {
         const ex = D.EXERCISES[c.exerciseId] || { name: c.exerciseId };
         return `<div class="card"><div class="title">${esc(ex.name)}</div><div class="muted" style="margin:4px 0 8px">${esc(c.reason)}</div>
@@ -911,11 +917,11 @@
     s.pain = { knee, leftHand: hand };
     L.completeSession(s, { startedAt, endedAt, effort: fin.effort, feeling: fin.feeling, notes });
     if (cal && cal.checked) s.calendarOptIn = true;
-    const changes = L.adjustFromSession(state, s, nowIso()).changes;
+    const res = L.adjustFromSession(state, s, nowIso());
     delete draft._finish;
     ui.open = null;
     persist(); closeSheet(); render();
-    resultSheet(s, changes);
+    resultSheet(s, res.changes, res.suggestions);
   }
   function berlinIsoLocal(date, time) { return L.berlinIso(date, time); }
 

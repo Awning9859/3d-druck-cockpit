@@ -23,6 +23,19 @@ Ordner: `heimtraining/` im Repository. Die 3D-Druck-App im Root bleibt unberühr
 
 Statusangaben haben immer Symbol und Text: ✓ abgeschlossen, ◐ teilweise, ✕ abgebrochen, ● offen, ○ geplant.
 
+## Trainingsplan 27.11. bis 18.12. (sieben Einheiten)
+
+Die Plan-Einheiten sind fest hinterlegt (`PLAN` in `data.js`) und stehen auch im Kalender. Jede Einheit beginnt mit dem Aufwärmen (Laufband, dann 8 Kniebeugen und 8 Hüftbeugen). Vorgaben wie Wiederholungen, Gewicht und Tempo stehen bei jeder Übung.
+
+- **Einheit 1, Fr 27.11. A (Basis)** und **2, Mi 2.12. B (Basis)**
+- **3, Fr 4.12. A** und **4, Mi 9.12. B** (Steigerung)
+- **5, Fr 11.12. A** und **6, Mi 16.12. B** (Tempo, erste Kettlebell-Swings)
+- **7, Fr 18.12. A** (Messung: letzter Satz bis kurz vor dem Versagen)
+
+Die Plan-Einheiten ändern ihre Vorgaben nicht automatisch. Nach jeder Einheit erscheint ein Vorschlag für das nächste Mal. Wenn du beim Start den Typ wechselst, verwendet die App die Vorlage des neuen Typs.
+
+Die Ausdauer-Anzeige zeigt Tempo und Endzeit des Abschnitts, zum Beispiel „5,0 km/h bis 9:00“.
+
 ## Gestaltung
 
 Creme `#F8F6F0` als Hintergrund, Petrol `#163C39` für Text und Hauptaktionen, Salbei `#DCE7DE` für Karten, Terrakotta `#BC583B` als Akzent. Schrift DM Sans, lokal eingebettet (Lizenz: SIL Open Font License, siehe `fonts/OFL-LICENSE.txt`).
@@ -92,7 +105,7 @@ Beispiel aus deinen Daten: Kreuzheben stand am 18.11. bei 2 × 8 mit 8 kg. Der P
 ## Was getestet wurde
 
 Automatisch geprüft:
-- `node --test tests/logic.test.js`: 27 Prüfungen der Logik (Startdaten, Plan, Satzsteuerung, alle Anpassungsregeln, Rückgängig, Kalenderdatei mit stabiler UID, Import/Export, Zeitzone).
+- `node --test tests/logic.test.js`: 30 Prüfungen der Logik (Startdaten, Plan, Satzsteuerung, alle Anpassungsregeln, Rückgängig, Kalenderdatei mit stabiler UID, Import/Export, Zeitzone).
 - `tests/e2e.js`: 14 Prüfungen im Browser bei Handy-Breite. Heute, Wochenplan, Verlauf, Satz-Ansicht, Neuladen mitten im Training, Überspringen, Abschluss, Export, Import.
 - `tests/e2e-flows.js`: 7 Ablaufprüfungen (abweichende Einheit, spontan, nachtragen, Plan neu berechnen).
 - `tests/e2e-export.js`: 6 Prüfungen des Kalender-Exports und dass keine Anfrage an Google geht.

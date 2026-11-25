@@ -56,7 +56,8 @@ const shots = process.env.SHOTS || path.join(process.env.TMPDIR || '/tmp', 'ht-s
     check('Übung nach erledigten Sätzen als erledigt markiert', progDone >= 1, 'erledigte Übungen: ' + progDone);
     // Erste Übung ist neu (Goblet Squat ohne Verlauf): nach Regel R6 keine Reserve-Rückfrage
     const rirAsked = await page.$('text=Wie viele saubere Wiederholungen');
-    check('Neue Übung fragt nicht nach Reserve (R6)', !rirAsked);
+    check('Bekannte Übung fragt nach der Reserve', !!rirAsked);
+    if (rirAsked) await page.click('.sheet [data-act="close"]');
     // Neu laden: Einheit muss an derselben Stelle weitergehen
     const before = await page.textContent('.setdots');
     await page.reload();
