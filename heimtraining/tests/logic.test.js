@@ -410,3 +410,14 @@ test('Plan: Plan-Einheit ändert ihre Vorgaben nie automatisch, nur Vorschläge'
   assert.deepEqual(s.targets, {}, 'keine Ziele verändert');
   assert.ok(res.suggestions.length > 0, 'Vorschlag für das obere Ende');
 });
+
+test('Gerätehinweis: erscheint erst, wenn Tempo und Wiederholungen mit dem Gewicht ausgeschöpft sind', () => {
+  const s = fresh();
+  const sess = s.sessions.find(x => x.planN === 7); // Einheit 7 hat Tempo bei Kreuzheben
+  L.startSession(s, sess, NOW, null);
+  sess.exercises.forEach((e, i) => e.sets.forEach((x, j) => L.logSet(sess, i, j, { reps: e.target.repMax || 10, weight: x.weight, holdSec: e.target.holdMax || null })));
+  L.completeSession(sess, { endedAt: '2026-12-18T16:50:00+01:00' });
+  const res = L.adjustFromSession(s, sess, NOW);
+  assert.ok(res.suggestions.some(t => t.startsWith('Gerätehinweis') && t.includes('Kettlebell')), 'Kettlebell-Hinweis');
+  assert.ok(res.suggestions.some(t => t.startsWith('Gerätehinweis') && t.includes('Kurzhanteln')), 'Kurzhantel-Hinweis');
+});

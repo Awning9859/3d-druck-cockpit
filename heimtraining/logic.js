@@ -379,6 +379,19 @@
       s.exercises.some(e => e.exerciseId === exerciseId && e.sets.some(x => x.status === 'erledigt')));
   }
 
+  // Hinweis, wenn für diese Übung ein neues Gewicht nötig werden kann (nur mit deinen vorhandenen Geräten)
+  function gearHintFor(exerciseId, weight) {
+    const ex = EXERCISES[exerciseId] || {};
+    if (!ex.equipment) return null;
+    if (ex.equipment.includes('kettlebell') && weight === 8) {
+      return 'Mit der 8-kg-Kettlebell ist der Reiz ausgeschöpft. Bevor du weiter steigerst, brauchst du eine schwerere Kettlebell (z. B. 12 kg). Erst kaufen, wenn Tempo und Pausen nicht mehr reichen.';
+    }
+    if (ex.equipment.includes('dumbbell') && weight === 2.5) {
+      return 'Mit den 2,5-kg-Kurzhanteln ist der Reiz ausgeschöpft. Bevor du weiter steigerst, brauchst du schwerere Kurzhanteln (z. B. 4 kg je Hand). Erst kaufen, wenn Tempo und Pausen nicht mehr reichen.';
+    }
+    return null;
+  }
+
   // Vorschlag für die nächste Einheit aus dem Ergebnis einer Plan-Einheit. Nichts wird automatisch geändert.
   function planSuggestions(session) {
     const out = [];
@@ -394,6 +407,11 @@
       }
       const reps = done.map(x => x.reps).filter(v => v != null);
       if (!reps.length || t.repMax == null) continue;
+      if (Math.min(...reps) >= t.repMax && t.tempo) {
+        // Tempo ist schon im Plan: der Reiz mit diesem Gewicht ist weitgehend ausgeschöpft
+        const hint = gearHintFor(ex.exerciseId, t.weight);
+        if (hint) out.push(`Gerätehinweis: ${name}. ${hint}`);
+      }
       if (Math.min(...reps) >= t.repMax) {
         out.push(`${name}: oberes Ende ${t.repMax} Wdh. geschafft. Nächstes Mal Tempo, dann kürzere Pausen. Gewicht nur bei passender Reserve.`);
       } else if (Math.min(...reps) < t.repMin) {
@@ -694,7 +712,7 @@
     calendarEventId, eventBody, icsCalendar, icsEvents,
     exportPayload, validateImport, importPayload, initialState, templateSlots, KIND_LABEL,
     planSlots, hasPreviousData, pruneFuturePlanned, berlinIso,
-    reassignStrengthTypes, createUnplanned, planSnapshot, diffPlans, planSuggestions, planTarget
+    reassignStrengthTypes, createUnplanned, planSnapshot, diffPlans, planSuggestions, planTarget, gearHintFor
   };
   if (typeof module === 'object' && module.exports) module.exports = api;
   root.HT_LOGIC = api;
